@@ -11,13 +11,9 @@
 #include "idt.h"
 #include "kb.h"
 #include "part.h"
-<<<<<<< HEAD
-#include "fat.h"
-=======
 #include "ata.h"
 #include "fs/vfs.h"
 #include "fs/fat.h"
->>>>>>> new
 
 gdtr_t* get_gdt();
 
@@ -53,15 +49,6 @@ int kmain(struct multiboot_info* mbd, unsigned int magic)
 	sti();
 	
 	partition_t part;
-<<<<<<< HEAD
-	part_read(0x80, 0, &part);
-	kprintf("Partition 0 boot flag: 0x%x\nPartition 0 system id: 0x%x - %s\nPartition 0 start LBA: %d\nPartition 0 size: %d MB\n",
-		part.boot_flag, part.system_id, part_filesystem_name(part.system_id), part.start_lba, part.length / 2 / 1024);
-		
-	fat_bpb_t bpb;
-	ata_read_sector(0x80, part.start_lba, &bpb);
-	kprintf("OEM: %s\nFAT offset: %d sectors\nDir entry count: %d\n", bpb.oem, bpb.reserved_sectors, bpb.directory_entry_count);
-=======
 	part_read(boot_drive, 0, &part);
 		
 	kprint("Initializing FAT filesystem... ");
@@ -71,7 +58,6 @@ int kmain(struct multiboot_info* mbd, unsigned int magic)
 	kprint("\nDir listing of /:\n");
 	vfs_readdir("/", NULL, dir_callback);
 	kprint("Done.\n");
->>>>>>> new
 	
 	while(true)
 	{

@@ -43,24 +43,3 @@ uint part_num_partitions(uchar disk)
 	}
 	return total;
 }
-
-char* part_filesystem_name(uchar system_id)
-{
-	switch(system_id)
-	{
-		case 0x00:
-		return "Unallocated Space";
-		case 0x01:
-		return "FAT12";
-		case 0x07:
-		return "NTFS";
-		case 0x0b:
-		return "FAT32";
-		case 0x0c:
-		return "FAT32 (LBA-mapped)";
-		case 0x0e:
-		return "FAT16 (LBA-mapped)";
-		default:
-		return "Unknown";
-	}
-}
