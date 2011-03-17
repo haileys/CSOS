@@ -17,10 +17,29 @@
 
 gdtr_t* get_gdt();
 
+struct cb
+{
+	char tmp[255];
+	uint levels;
+};
+
 static bool dir_callback(void* state, char* name, vfs_type_t type)
 {
-	state = state;
-	kprintf("  %s: %s\n", type == VFS_FILE ? "File" : "Dir", name);
+	if(strcmp(".", name) == 0 || strcmp("..", name) == 0)
+		return true;
+	for(uint i = 0; i < ((struct cb*)state)->levels; i++)
+		kprintf("- ");
+	kprintf("* %s\n", name);
+	if(type == VFS_DIR)
+	{
+		struct cb st;
+		st.levels = ((struct cb*)state)->levels + 1;
+		strcpy(st.tmp, ((struct cb*)state)->tmp);
+		st.tmp[strlen(((struct cb*)state)->tmp)] = '/';
+		strcpy(st.tmp + 1 + strlen(((struct cb*)state)->tmp), name);
+		st.tmp[(uint)st.tmp + 1 + strlen(((struct cb*)state)->tmp)] = 0;
+		vfs_readdir(st.tmp, &st, dir_callback);
+	}
 	return true;
 }
 
@@ -55,9 +74,11 @@ int kmain(struct multiboot_info* mbd, unsigned int magic)
 	vfs_init(fat_vfs(boot_drive, &part));
 	kprint("Ok.\n");
 	
-	kprint("\nDir listing of /:\n");
-	vfs_readdir("/", NULL, dir_callback);
-	kprint("Done.\n");
+	char* filename = "/a.txt";
+	kprintf("%s is %d bytes long. Contents:\n\n", filename, vfs_size(filename));
+	uint read = vfs_readfile(filename, 0, 512, tmp);
+	tmp[read] = 0;
+	kprintf("%s", tmp);
 	
 	while(true)
 	{

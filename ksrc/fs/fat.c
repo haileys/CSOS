@@ -16,6 +16,7 @@ bool fat_vfs_exists(struct fat_vfs_state* state, char* path);
 vfs_type_t fat_vfs_type(struct fat_vfs_state* state, char* path);
 size_t fat_vfs_size(struct fat_vfs_state* state, char* path);
 uint fat_vfs_readdir(struct fat_vfs_state* state, char* path, void* cbstate, bool(*callback)(void*, char*, vfs_type_t));
+uint fat_vfs_readfile(struct fat_vfs_state* state, char* path, uint offset, size_t length, void* buffer);
 
 static void fat_read_cached(struct fat_vfs_state* state)
 {
@@ -54,6 +55,8 @@ vfs_provider_t* fat_vfs(uchar bios_drive, partition_t* partition)
 	prov->exists = (bool(*)(void*,char*))fat_vfs_exists;
 	prov->type = (vfs_type_t(*)(void*,char*))fat_vfs_type;
 	prov->size = (size_t(*)(void*,char*))fat_vfs_size;
+	prov->readdir = (uint(*)(void*, char*, void*, bool(*)(void*, char*, vfs_type_t)))fat_vfs_readdir;
+	prov->readfile = (uint(*)(void*, char*, uint, size_t, void*))fat_vfs_readfile;
 	
 	return prov;
 }
@@ -120,7 +123,7 @@ static char* fattostr(char* dest, char* src)
 		}
 	}
 	dest[j++] = '.';
-	while(src[i] != ' ')
+	while(i < 11 && src[i] != ' ')
 	{	
 		if(src[i] >= 'A' && src[i] <= 'Z')
 			dest[j] = 'a' + (src[i] - 'A');
@@ -129,13 +132,16 @@ static char* fattostr(char* dest, char* src)
 		j++;
 		i++;
 	}
+	if(dest[j-1] == '.')
+		j--;
+	dest[j] = 0;
 	return dest;
 }
 
 ushort fat_read_cluster(fat_volume_t* volume, ushort cluster, void* buffer)
 {
 	part_read_sectors(volume->bios_drive, volume->partition, volume->first_data_sector + (volume->bpb.root_entry_count / 16) + (cluster * volume->bpb.sectors_per_cluster) - 2, volume->bpb.sectors_per_cluster, buffer);
-	return 0;
+	return volume->fat[2 + cluster];
 }
 
 static fat_entry_t* fat_find_in_dir(fat_entry_t* dir, char* filename)
@@ -315,7 +321,7 @@ uint fat_vfs_readdir(struct fat_vfs_state* state, char* path, void* cbstate, boo
 				
 			if(dir[i].attributes & (FAT_ATTR_DEVICE | FAT_ATTR_VOLUME_ID | FAT_ATTR_UNUSED))
 				continue;
-				
+			
 			char tmp[14];
 			fattostr(tmp, (char*)dir[i].filename);
 			cnt++;
@@ -339,16 +345,23 @@ uint fat_vfs_readdir(struct fat_vfs_state* state, char* path, void* cbstate, boo
 			while(entp->filename[0])
 			{
 				if(entp->filename[0] == 0xe5)
+				{
+					entp++;
 					continue;
+				}
 					
 				if(entp->attributes & (FAT_ATTR_DEVICE | FAT_ATTR_VOLUME_ID | FAT_ATTR_UNUSED))
+				{
+					entp++;
 					continue;
+				}
 					
 				char tmp[14];
 				fattostr(tmp, (char*)entp->filename);
 				cnt++;
 				if(!callback(cbstate, tmp, entp->attributes & FAT_ATTR_DIRECTORY ? VFS_DIR : VFS_FILE))
 					goto cleanup;
+				entp++;
 			}
 		}
 	}
@@ -358,4 +371,51 @@ uint fat_vfs_readdir(struct fat_vfs_state* state, char* path, void* cbstate, boo
 		kfree(path_parts[i]);
 	kfree(path_parts);
 	return cnt;
+}
+
+uint fat_vfs_readfile(struct fat_vfs_state* state, char* path, uint offset, size_t length, void* buffer)
+{
+	uint filesize = fat_vfs_size(state, path);
+	if(filesize == 0 || length == 0)
+		return 0;
+	
+	char** path_parts;
+	uint len = parse_path(path, &path_parts);
+	
+	uint bytes = 0;
+	
+	fat_entry_t ent;
+	if(fat_find_ent(state, path_parts, len, &ent))
+	{
+		uint bpc = state->volume.bpb.sectors_per_cluster * 512;
+		char buff[bpc];
+	
+		ushort cluster_number = ent.first_cluster;
+	
+		for(uint i = 0; i < offset / bpc; i++)
+		{	
+			if(cluster_number >= 0xfff8)
+				goto cleanup;
+			cluster_number = state->volume.fat[cluster_number + 2];
+			offset -= bpc;
+		}
+	
+		while(length > 0)
+		{
+			ushort next_cluster = fat_read_cluster(&state->volume, cluster_number, buff);
+			uint chunk = length > bpc - offset ? bpc - offset : length;
+			memcpy((char*)buffer + bytes, buff + offset, chunk);
+			bytes += chunk;
+			length -= chunk;
+			if(next_cluster >= 0xfff8)
+				goto cleanup;
+			cluster_number = next_cluster;
+		}
+	}
+	
+	cleanup:
+	for(uint i = 0; i < len; i++)
+		kfree(path_parts[i]);
+	kfree(path_parts);
+	return bytes;
 }

@@ -2,6 +2,10 @@
 
 rm bin/*
 
+for f in $(find build | grep "/\."); do
+	rm $f
+done
+
 CFLAGS="-std=c99 -iquote kinc -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel $1"
 
 nasm -f elf -o bin/aaa_loader_asm.o ksrc/loader.asm
