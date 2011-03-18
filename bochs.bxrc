@@ -38,7 +38,7 @@ sb16: enabled=0
 # no loader
 log: -
 logprefix: %t%e%d
-panic: action=ask
+panic: action=report
 error: action=report
 info: action=report
 debug: action=ignore

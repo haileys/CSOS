@@ -3,7 +3,7 @@
 
 #include "stddef.h"
 
-void mm_init();
+void kmalloc_init();
 
 #ifdef MALLOC_PRINT_DEBUG
 	#define kmalloc(len) _kmalloc(len, __FILE__, __LINE__)

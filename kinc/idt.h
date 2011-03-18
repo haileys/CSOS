@@ -31,19 +31,9 @@ typedef enum idt_gate_type
 }
 idt_gate_type_t;
 
-typedef struct isr_handler
-{
-	/* if this handler is the first in the handler chain,
-	   then prev should contain a number less than 256
-	   corresponding to the interrupt vector */
-	struct isr_handler* prev;
-	struct isr_handler* next;
-	void* state;
-	void(*handler)(uint interrupt, uint errorcode, void* state);
-}
-isr_handler_t;
-
 void idt_entry_factory(idt_entry_t* entry, ushort selector, uint offset, uchar dpl, idt_gate_type_t gate_type);
+
+void idt_set_privilege(uint interrupt, uchar dpl);
 
 inline static void cli()
 {
@@ -62,9 +52,10 @@ inline static bool interrupts_enabled()
 void begin_no_ints();
 void end_no_ints();
 
-isr_handler_t* subscribe_isr(uchar interrupt, void* state, void(*isr)(uint interrupt, uint errorcode, void* state));
-void unsubscribe_isr(isr_handler_t* handler);
+void subscribe_isr(uchar interrupt, void(*isr)(uint, uint));
+void unsubscribe_isr(uchar interrupt);
 
 void idt_init();
+void idt_map_irqs();
 
 #endif

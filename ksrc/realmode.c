@@ -2,6 +2,7 @@
 #include "string.h"
 #include "realmode.h"
 #include "console.h"
+#include "idt.h"
 
 extern char bin_code16[];
 extern uint bin_code16_len;
@@ -15,6 +16,8 @@ void real_exec(void* codebuffer, size_t len)
 	memcpy((void*)0x9000, codebuffer, len);
 	
 	((void(*)())0x8000)();
+	
+	idt_map_irqs();
 }
 
 void bios_int(uchar interrupt, regs_16_t* regs)

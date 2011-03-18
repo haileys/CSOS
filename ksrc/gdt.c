@@ -4,7 +4,7 @@
 #include "console.h"
 #include "panic.h"
 
-gdt_raw_entry_t* GDT = (gdt_raw_entry_t*)0x00000600;
+gdt_raw_entry_t* GDT = (gdt_raw_entry_t*)0x0000F000;
 
 void gdt_code_entry_factory(gdt_entry_t* entry, uint base, uint size, ushort privilege, bool conforming, bool readable)
 {

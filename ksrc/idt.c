@@ -11,7 +11,7 @@ idtr_t idtr;
 static bool int_state_stack[16];
 static bool* int_state_stack_ptr = int_state_stack;
 
-static isr_handler_t* isr_handlers[256];
+static void(*isr_handlers[256])(uint,uint);
 
 void idt_entry_factory(idt_entry_t* entry, ushort selector, uint offset, uchar dpl, idt_gate_type_t gate_type)
 {
@@ -28,16 +28,12 @@ void idt_entry_factory(idt_entry_t* entry, ushort selector, uint offset, uchar d
 //
 /* assembly interface stuffola */
 uint isr_dispatch(uint interrupt, uint errorcode)
-{
+{	
 	if(interrupt == 39) // spurious IRQ 7
 		return interrupt;
 	
-	isr_handler_t* node = isr_handlers[interrupt];
-	while(node)
-	{
-		node->handler(interrupt, errorcode, node->state);
-		node = node->next;
-	}
+	if(isr_handlers[interrupt])
+		isr_handlers[interrupt](interrupt, errorcode);
 	
 	// for debugging purposes
 //	if(interrupt != 32)
@@ -48,6 +44,13 @@ uint isr_dispatch(uint interrupt, uint errorcode)
 void idt_register_handler(uint interrupt, uint handler_ptr)
 {
 	idt_entry_factory(IDT + interrupt, 0x08, handler_ptr, 0, GATE_INT_32);
+}
+void idt_set_privilege(uint interrupt, uchar dpl)
+{
+	uchar type = IDT[interrupt].type;
+	type &= ~(0x3 << 5);
+	type |= (dpl & 0x3) << 5;
+	IDT[interrupt].type = type;
 }
 /* - fin - */
 //
@@ -64,46 +67,41 @@ void end_no_ints()
 		sti();
 }
 
-isr_handler_t* subscribe_isr(uchar interrupt, void* state, void(*isr)(uint interrupt, uint errorcode, void* state))
+void subscribe_isr(uchar interrupt, void(*isr)(uint interrupt, uint errorcode))
 {
-	isr_handler_t* h = (isr_handler_t*)kmalloc(sizeof(isr_handler_t));
-	h->next = NULL;
-	if(!isr_handlers[interrupt])
-	{
-		h->prev = (isr_handler_t*)(uint)interrupt; // this is somewhat of a hack
-		isr_handlers[interrupt] = h;
-	}
-	else
-	{
-		isr_handler_t* node = isr_handlers[interrupt];
-		while(node->next)
-			node = node->next;
-		h->prev = node;
-		node->next = h;
-	}
-	h->state = state;
-	h->handler = isr;
-	return h;
+	if(isr_handlers[interrupt])
+		panicf("Attempted to subscribe to already subscribed interrupt: 0x%x", interrupt);
+		
+	isr_handlers[interrupt] = isr;
 }
-void unsubscribe_isr(isr_handler_t* handler)
+void unsubscribe_isr(uchar interrupt)
 {
-	if((uint)handler->prev >= 256)
-	{
-		handler->prev->next = handler->next;
-	}
-	else
-	{
-		isr_handlers[(uint)handler->prev] = handler->next;
-	}
-	
-	kfree(handler);
+	if(!isr_handlers[interrupt])
+		panicf("Attempted to unsubscribe null ISR: 0x%x", interrupt);
+		
+	isr_handlers[interrupt] = NULL;
 }
 
 void asm_isr_init();
 
 void idt_init()
 {
+	cli();
 	memset(IDT, 0, 256 * 8);
+	
+	// init the handler thingies in assembly
+	asm_isr_init();
+	
+	idt_map_irqs();
+	
+	idtr.limit = 256*8 - 1;
+	idtr.base = (uint)IDT;
+	__asm__("lidt idtr");
+	sti();
+}
+
+void idt_map_irqs()
+{	
 	// remap IRQ table
 	outb(0x20, 0x11);
 	outb(0xA0, 0x11);
@@ -115,11 +113,4 @@ void idt_init()
 	outb(0xA1, 0x01);
 	outb(0x21, 0x0);
 	outb(0xA1, 0x0);
-	
-	// init the handler thingies in assembly
-	asm_isr_init();
-	
-	idtr.limit = 256*8 - 1;
-	idtr.base = (uint)IDT;
-	__asm__("lidt idtr");
 }

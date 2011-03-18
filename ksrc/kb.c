@@ -19,12 +19,11 @@ static bool alt = false;
 static uchar uppercase_keys[256] = { 0 };
 static uchar lowercase_keys[256] = { 0 };
 
-static void kb_isr(uint interrupt, uint error, void* state)
+static void kb_isr(uint interrupt, uint error)
 {
 	// make gcc shutup
 	interrupt = interrupt;
 	error = error;
-	state = state;
 	
 	uchar k = inb(0x60);
 	if(kb_isr_escaped)
@@ -71,13 +70,14 @@ static void kb_isr(uint interrupt, uint error, void* state)
 void kb_us_keymap();
 void kb_init()
 {
-	subscribe_isr(33, NULL, kb_isr);
+	subscribe_isr(33, kb_isr);
 	kb_us_keymap();
 }
 
 scancode_t kb_read_scancode()
 {
 	key_ready = false;
+	sti();
 	while(!key_ready)
 		__asm__("hlt");
 	scancode_t sc;
@@ -87,7 +87,7 @@ scancode_t kb_read_scancode()
 }
 
 key_t kb_read_key()
-{
+{	
 	scancode_t sc = kb_read_scancode();
 	key_t key;
 	key.ctrl = ctrl;

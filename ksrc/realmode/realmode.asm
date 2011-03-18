@@ -5,7 +5,7 @@ org 0x8000
 entry:
 	pusha
 	mov [saved_esp], esp
-	mov eax, 0x4000
+	mov eax, 0xeff0
 	mov esp, eax
 	jmp 0x18:move_to_real
 
@@ -19,7 +19,7 @@ move_to_real:
 	mov ss, eax
 
 	mov eax, cr0
-	and al, ~1
+	and eax, 01111111_11111111_11111111_11111110b
 	mov cr0, eax
 
 	jmp 0:in_real
@@ -31,7 +31,7 @@ in_real:
 	mov fs, ax
 	mov gs, ax
 	mov ss, ax
-	mov sp, 0x4000
+	mov sp, 0xeff0
 	
 	lidt [idt_real]
 	sti
@@ -47,15 +47,16 @@ in_real:
 	
 	cli
 	mov eax, cr0
-	or al, 1
+	or eax, 0x80000001
 	mov cr0, eax
 	lidt [idt_prot]
 	sti
-	
+	lgdt [gdt_prot]
 	jmp 0x08:protected
 	
 protected:
 	use32
+	
 	mov eax, 0x10
 	mov ds, eax
 	mov es, eax
@@ -64,6 +65,7 @@ protected:
 	mov ss, eax
 	mov esp, [saved_esp]
 	popa
+	sti
 	ret
 
 saved_esp:
@@ -73,7 +75,7 @@ idt_real:
 	dd 0
 gdt_prot:
 	dw 0x1000
-	dd 0x00000600
+	dd 0x0000F000
 idt_prot:
 	dw (256*8)-1
 	dd 0x00001600

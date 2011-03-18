@@ -15,3 +15,5 @@
 * `00120000` - `001FFFFF` **My kernel!**
 
 * `00200000` - `003FFFFF` **Kernel Heap**
+
+* `00400000` - `007FFFFF` **Page tables**

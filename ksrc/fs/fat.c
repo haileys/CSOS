@@ -25,18 +25,6 @@ static void fat_read_cached(struct fat_vfs_state* state)
 	part_read_sectors(state->volume.bios_drive, state->volume.partition, state->volume.first_data_sector, state->volume.bpb.root_entry_count / (512/32), state->volume.root_entries);
 }
 
-static void fat_write_cached(struct fat_vfs_state* state)
-{
-	for(uint i = 0; i < state->volume.bpb.sectors_per_fat; i++)
-	{	
-		part_write_sector(state->volume.bios_drive, state->volume.partition, state->volume.first_fat_sector + i, &(state->volume.fat[i * 256 /* 256 shorts in a sector */]));
-	}
-	for(uint i = 0; i < state->volume.bpb.root_entry_count / (512/32); i++)
-	{
-		part_write_sector(state->volume.bios_drive, state->volume.partition, state->volume.first_data_sector + i, &(state->volume.root_entries[i * 16 /* 16 x 32byte entries in a sector */]));
-	}
-}
-
 vfs_provider_t* fat_vfs(uchar bios_drive, partition_t* partition)
 {
 	vfs_provider_t* prov = (vfs_provider_t*)kmalloc(sizeof(vfs_provider_t));
@@ -141,7 +129,7 @@ static char* fattostr(char* dest, char* src)
 ushort fat_read_cluster(fat_volume_t* volume, ushort cluster, void* buffer)
 {
 	part_read_sectors(volume->bios_drive, volume->partition, volume->first_data_sector + (volume->bpb.root_entry_count / 16) + (cluster * volume->bpb.sectors_per_cluster) - 2, volume->bpb.sectors_per_cluster, buffer);
-	return volume->fat[2 + cluster];
+	return volume->fat[cluster];
 }
 
 static fat_entry_t* fat_find_in_dir(fat_entry_t* dir, char* filename)
@@ -150,6 +138,11 @@ static fat_entry_t* fat_find_in_dir(fat_entry_t* dir, char* filename)
 	strtofat(fatname, filename);
 	while(dir->filename[0] > 0)
 	{
+		if(dir->attributes & (FAT_ATTR_DEVICE | FAT_ATTR_VOLUME_ID | FAT_ATTR_UNUSED))
+		{	
+			dir++;
+			continue;
+		}
 		if(dir->filename[0] == 0xe5)
 		{
 			dir++;
@@ -234,7 +227,7 @@ static bool fat_find_ent(struct fat_vfs_state* state, char** path_parts, uint le
 		{
 			if(ent->attributes & FAT_ATTR_DIRECTORY)
 			{
-				memset(entries, 0, state->volume.bpb.sectors_per_cluster * 512);
+				memset(entries, 0, state->volume.bpb.sectors_per_cluster * 16);
 				fat_read_cluster(&state->volume, ent->first_cluster, entries);
 				dir = entries;
 			}
@@ -373,6 +366,18 @@ uint fat_vfs_readdir(struct fat_vfs_state* state, char* path, void* cbstate, boo
 	return cnt;
 }
 
+static void fat_ent_readcluster(struct fat_vfs_state* state, fat_entry_t* ent, uint cluster, void* buffer)
+{
+	ushort cluster_number = ent->first_cluster;
+	for(uint i = 0; i < cluster; i++)
+	{
+		// skip ahead clusters
+		cluster_number = state->volume.fat[cluster_number];
+	}
+	
+	fat_read_cluster(&state->volume, cluster_number, buffer);
+}
+
 uint fat_vfs_readfile(struct fat_vfs_state* state, char* path, uint offset, size_t length, void* buffer)
 {
 	uint filesize = fat_vfs_size(state, path);
@@ -380,40 +385,22 @@ uint fat_vfs_readfile(struct fat_vfs_state* state, char* path, uint offset, size
 		return 0;
 	
 	char** path_parts;
-	uint len = parse_path(path, &path_parts);
-	
+	uint len = parse_path(path, &path_parts);	
 	uint bytes = 0;
 	
 	fat_entry_t ent;
 	if(fat_find_ent(state, path_parts, len, &ent))
 	{
 		uint bpc = state->volume.bpb.sectors_per_cluster * 512;
-		char buff[bpc];
-	
-		ushort cluster_number = ent.first_cluster;
-	
-		for(uint i = 0; i < offset / bpc; i++)
-		{	
-			if(cluster_number >= 0xfff8)
-				goto cleanup;
-			cluster_number = state->volume.fat[cluster_number + 2];
-			offset -= bpc;
-		}
-	
-		while(length > 0)
-		{
-			ushort next_cluster = fat_read_cluster(&state->volume, cluster_number, buff);
-			uint chunk = length > bpc - offset ? bpc - offset : length;
-			memcpy((char*)buffer + bytes, buff + offset, chunk);
-			bytes += chunk;
-			length -= chunk;
-			if(next_cluster >= 0xfff8)
-				goto cleanup;
-			cluster_number = next_cluster;
-		}
+		uint start_cluster = offset / bpc;
+		uint end_cluster = (offset + length - 1) / bpc;
+		char buff[bpc * (end_cluster - start_cluster + 1)];
+		for(uint clus = start_cluster; clus <= end_cluster; clus++)
+			fat_ent_readcluster(state, &ent, clus, buff + bpc * (clus - start_cluster));
+		memcpy(buffer, buff + offset - start_cluster * bpc, length);
+		bytes = length;
 	}
 	
-	cleanup:
 	for(uint i = 0; i < len; i++)
 		kfree(path_parts[i]);
 	kfree(path_parts);

@@ -27,8 +27,8 @@ isr_main:
 	call isr_dispatch
 	add esp, 8
 	
-	cmp eax, 8
-	jl .dont_send_other_clearance
+;	cmp eax, 8
+;	jl .dont_send_other_clearance
 		mov al, 0xa0
 		out 0x20, al
 	.dont_send_other_clearance:
@@ -94,5 +94,7 @@ asm_isr_init:
 	isr 47
 	isr 48
 	isr 49
+	
+	isr 0x80
 	
 	ret

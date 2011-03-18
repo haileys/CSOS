@@ -17,7 +17,7 @@ static uint n_chunks;
 
 static bool mm_fix_chunk(uint chunk, uint* next_chunk);
 
-void mm_init(char* begin, size_t len)
+void kmalloc_init(char* begin, size_t len)
 {
 	alloc_begin = begin;
 	alloc_end = begin + len;

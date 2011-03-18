@@ -37,7 +37,7 @@ bool ata_read_sector(uchar disk, uint lba, void* buffer)
 	
 	bool success = !(*(bool*)0x2000);
 	if(!success)
-		panic("Disk read unsuccesful.");
+		panicf("Read failed. LBA = %d, buffer = 0x%x", lba, buffer);
 		
 	return success;
 }

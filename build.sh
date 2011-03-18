@@ -50,10 +50,15 @@ gcc $CFLAGS ksrc/kb.c -o bin/kb.o
 gcc $CFLAGS ksrc/part.c -o bin/part.o
 gcc $CFLAGS ksrc/fs/fat.c -o bin/fs_fat.o
 gcc $CFLAGS ksrc/fs/vfs.c -o bin/fs_vfs.o
+gcc $CFLAGS ksrc/task.c -o bin/task.o
+gcc $CFLAGS ksrc/trap.c -o bin/trap.o
+gcc $CFLAGS ksrc/paging.c -o bin/paging.o
 
 ld -T linker.ld -o build/kernel.sys bin/*.o
 gcc -std=c99 -o util/inject_symbols util/inject_symbols.c
-perl util/find_symbols.pl build/kernel.sys | util/inject_symbols build/kernel.sys
+#perl util/find_symbols.pl build/kernel.sys | util/inject_symbols build/kernel.sys
+
+nasm -f bin -o build/r3task.bin user/ring3.asm
 
 dd if=/dev/zero of=hdd.img bs=33546240 count=1 status=noxfer &>/dev/null
 
@@ -70,3 +75,5 @@ umount mnt
 rm -rf mnt
 
 grub --device-map=/dev/null --batch < grubscript &> /dev/null
+
+gzip -c -9 hdd.img > hdd.img.gz
