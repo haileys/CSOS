@@ -14,7 +14,7 @@ get_gdt:
 gdt_reload_segment_registers:
 	jmp 0x08:.boom
 	.boom:
-	mov ax, 0x10
+	mov eax, 0x10
 	mov ds, ax
 	mov es, ax
 	mov fs, ax

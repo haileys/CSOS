@@ -11,7 +11,14 @@ CFLAGS="-std=c99 -iquote kinc -Wall -Wextra -nostdlib -fno-builtin -nostartfiles
 nasm -f elf -o bin/aaa_loader_asm.o ksrc/loader.asm
 nasm -f elf -o bin/helper_asm.o ksrc/helper.asm
 nasm -f elf -o bin/panic_asm.o ksrc/panic.asm
-nasm -f elf -o bin/isrs.o ksrc/isrs.asm
+nasm -f elf -o bin/isrs_asm.o ksrc/isrs.asm
+nasm -f elf -o bin/task_asm.o ksrc/task.asm
+nasm -f elf -o bin/syscall_asm.o ksrc/syscall.asm
+
+#user mode crap
+nasm -f bin -o build/init.bin user/init.asm
+nasm -f bin -o build/a.bin user/a.asm
+nasm -f bin -o build/b.bin user/b.asm
 
 gcc -std=c99 -o util/bin2nasm util/bin2nasm.c
 # custom binaries to include in image!!
@@ -53,10 +60,11 @@ gcc $CFLAGS ksrc/fs/vfs.c -o bin/fs_vfs.o
 gcc $CFLAGS ksrc/task.c -o bin/task.o
 gcc $CFLAGS ksrc/trap.c -o bin/trap.o
 gcc $CFLAGS ksrc/paging.c -o bin/paging.o
+gcc $CFLAGS ksrc/syscall.c -o bin/syscall.o
 
 ld -T linker.ld -o build/kernel.sys bin/*.o
 gcc -std=c99 -o util/inject_symbols util/inject_symbols.c
-#perl util/find_symbols.pl build/kernel.sys | util/inject_symbols build/kernel.sys
+perl util/find_symbols.pl build/kernel.sys | util/inject_symbols build/kernel.sys
 
 nasm -f bin -o build/r3task.bin user/ring3.asm
 

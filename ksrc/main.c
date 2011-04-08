@@ -21,17 +21,11 @@
 gdtr_t* get_gdt();
 void switch_to_user_mode();
 
-struct cb
-{
-	char tmp[255];
-	uint levels;
-};
-
 static void ring3_helloworld(uint interrupt, uint error)
 {
 	interrupt = interrupt;
 	error = error;
-	kprintf("Hello from ring3");
+	kprintf("EAX = %x\n", task_current()->tss.eax);
 }
 
 int kmain(struct multiboot_info* mbd, unsigned int magic)
@@ -40,14 +34,14 @@ int kmain(struct multiboot_info* mbd, unsigned int magic)
 	{
 		panic("Multiboot did not pass correct magic number");
 	}
-	if(mbd->mem_upper < 16*1024*1024)
+	if(mbd->mem_upper < 16*1024)
 	{
 		panic("Not enough memory");
 	}
 	char tmp[513];
 	uchar boot_drive = (mbd->boot_device >> 24) & 0xff;
 	
-	paging_init();
+	paging_init((mbd->mem_upper + mbd->mem_lower + 1023) / 1024);
 	
 	console_init();
 	console_clear();
@@ -73,51 +67,21 @@ int kmain(struct multiboot_info* mbd, unsigned int magic)
 	vfs_init(fat_vfs(boot_drive, &part));
 	kprint("Ok.\n");
 	
-	//
-	// let's get to ring3
-	//
-	
-	gdt_entry_t r3_code;
-	gdt_raw_entry_t r3_craw;
-	gdt_code_entry_factory(&r3_code, 0, 0xffffffff, 3, false, true);
-	gdt_encode(&r3_code, &r3_craw);
-	gdt_set_entry(0x80, &r3_craw);
-	
-	gdt_entry_t r3_data;
-	gdt_raw_entry_t r3_draw;
-	gdt_data_entry_factory(&r3_data, 0, 0xffffffff, 3, true);
-	gdt_encode(&r3_data, &r3_draw);
-	gdt_set_entry(0x88, &r3_draw);	
-	
-	tss_t r3_tss;
-	
-	gdt_entry_t r3_tss_seg;
-	gdt_raw_entry_t r3_tss_raw;
-	r3_tss_seg.base = (uint)&r3_tss;
-	r3_tss_seg.limit = sizeof(tss_t);
-	r3_tss_seg.executable = true;
-	r3_tss_seg.accessed = true;
-	r3_tss_seg.bits32 = true;
-	r3_tss_seg.readwrite = false;
-	r3_tss_seg.privilege = 3;
-	gdt_encode(&r3_tss_seg, &r3_tss_raw);
-	((uchar*)&r3_tss_raw)[5] = 0x89; // hack to set access byte.
-	gdt_set_entry(0x90, &r3_tss_raw);
-	
-	char* kernel_stack_pointer = kmalloc(0x10000);
-	r3_tss.ss0 = 0x10;
-	r3_tss.esp0 = (uint)kernel_stack_pointer + 0xfff0;
-	r3_tss.iopb = sizeof(tss_t);
-	__asm__("ltr ax" :: "a"(0x90));
-	
-	gdt_flush();
-	
-	kprintf("Set up relevant GDT entries for ring3.\nJumping to ring3...\n");
 	
 	subscribe_isr(0x80, ring3_helloworld);
 	idt_set_privilege(0x80, 3);
 	
-	switch_to_user_mode();
+	char buff[4096];
+	
+	vfs_readfile("/a.bin", 0, vfs_size("/a.bin"), buff);
+	task_create(4096, buff, 4096);
+	
+	vfs_readfile("/b.bin", 0, vfs_size("/b.bin"), buff);
+	task_create(4096, buff, 4096);
+	
+	cli();
+	idt_register_handler(32, (uint)task_switch);
+	sti();
 	
 	while(true)
 	{

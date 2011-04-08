@@ -13,6 +13,11 @@ static bool* int_state_stack_ptr = int_state_stack;
 
 static void(*isr_handlers[256])(uint,uint);
 
+void idt_set_gate(uchar gate, idt_entry_t* ent)
+{
+	memcpy(&IDT[gate], ent, sizeof(idt_entry_t));
+}
+
 void idt_entry_factory(idt_entry_t* entry, ushort selector, uint offset, uchar dpl, idt_gate_type_t gate_type)
 {
 	entry->offset_high = (offset >> 16) & 0xffff;
@@ -69,14 +74,14 @@ void end_no_ints()
 
 void subscribe_isr(uchar interrupt, void(*isr)(uint interrupt, uint errorcode))
 {
-	if(isr_handlers[interrupt])
+	if(isr_handlers[interrupt] != NULL)
 		panicf("Attempted to subscribe to already subscribed interrupt: 0x%x", interrupt);
 		
 	isr_handlers[interrupt] = isr;
 }
 void unsubscribe_isr(uchar interrupt)
 {
-	if(!isr_handlers[interrupt])
+	if(isr_handlers[interrupt] == NULL)
 		panicf("Attempted to unsubscribe null ISR: 0x%x", interrupt);
 		
 	isr_handlers[interrupt] = NULL;

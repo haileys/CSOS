@@ -70,15 +70,44 @@ typedef enum task_state
 task_state_t;
 
 typedef struct task
-{
+{		
+	// must be first member, so the offsets of members are known.
 	tss_t tss;
-	uint page_directory[1024] __attribute__((aligned(0x1000)));
+	uint pid;
+	uint* page_directory;
 	task_state_t state;
+	char kernel_stack[8192];
 }
-task_t;
+__attribute__((__packed__)) /* so i can access the struct straight from assembly */ task_t;
+
+typedef struct regs
+{	
+	uint es;
+	uint fs;
+	uint gs;
+	uint ds;
+	uint edi;
+	uint esi;
+	uint ebp;
+	uint esp;
+	uint ebx;
+	uint edx;
+	uint ecx;
+	uint eax;
+}
+__attribute__((__packed__)) regs_t;
 
 void task_init(uint base_physical, uint high_memory);
 uint alloc_page();
-void free_page();
+void free_page(uint page);
+task_t* task_create(uint size, void* code, uint stack_size);
+uint task_add_page(task_t* task);
+void task_del_page(task_t* task, uint virtual);
+void task_add_virtual(task_t*, uint virtual);
+void task_switch();
+
+task_t* task_current();
+
+void task_peek(task_t* task, uint virtual, uint length, void* buffer);
 
 #endif

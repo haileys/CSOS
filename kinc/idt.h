@@ -32,7 +32,7 @@ typedef enum idt_gate_type
 idt_gate_type_t;
 
 void idt_entry_factory(idt_entry_t* entry, ushort selector, uint offset, uchar dpl, idt_gate_type_t gate_type);
-
+void idt_set_gate(uchar gate, idt_entry_t* ent);
 void idt_set_privilege(uint interrupt, uchar dpl);
 
 inline static void cli()
@@ -57,5 +57,6 @@ void unsubscribe_isr(uchar interrupt);
 
 void idt_init();
 void idt_map_irqs();
+void idt_register_handler(uint interrupt, uint handler_ptr);
 
 #endif
