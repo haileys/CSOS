@@ -77,30 +77,6 @@ task_switch:
 	
 	.skip_save:
 	
-	; now let's find what process to switch to next
-;	mov ecx, 0
-;	.find_next_loop:
-;		cmp ecx, MAX_TASKS
-;		je .find_next_loop_end
-;		
-;		mov eax, [current_task]
-;		add eax, ecx
-;		xor edx, edx ; sign extend edx
-;		mov ebx, MAX_TASKS
-;		div ebx
-;		; remainder is in EDX, that's the task to try and swap to
-;		mov eax, edx
-;		cmp eax, 1
-;		jne .eax0
-;		call panic
-;		.eax0:
-;		mov ebx, [tasks + eax * 4]
-;		cmp ebx, 0 ; NULL
-;		jne .find_next_loop_end
-;		
-;		inc ecx
-;		jmp .find_next_loop
-;	.find_next_loop_end:
 	; eax contains the task index of the task we'll switch to
 	mov eax, [current_task]
 	push eax
