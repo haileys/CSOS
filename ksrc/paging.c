@@ -62,7 +62,7 @@ void paging_unmap(uint virtual)
 	uint* table = (uint*)(page_directory[dir_i] & 0xfffff000);
 	
 	if(!(table[tbl_i] & 1))
-		panic("Tried to unmap unampped page table entry");
+		panic("Tried to unmap unmapped page table entry");
 	
 	table[tbl_i] = 0;
 	
@@ -73,5 +73,5 @@ uint paging_virtual_to_physical(uint* page_directory, uint virtual)
 {
 	uint* table = (uint*)(page_directory[(virtual / 4096) / 1024] & 0xfffff000);
 	uint phys = table[(virtual / 4096) % 1024] & 0xfffff000;
-	return phys + (virtual & 0xfff);
+	return phys | (virtual & 0xfff);
 }

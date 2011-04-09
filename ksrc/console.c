@@ -2,6 +2,9 @@
 #include "string.h"
 #include "io.h"
 #include "stdarg.h"
+#include "kmalloc.h"
+
+#define UNUSED __attribute__((unused)) 
 
 static uint col = 0;
 static uint row = 0;
@@ -12,6 +15,37 @@ static char* vram = (char*)0xb8000;
 
 //extern char bin_console16[];
 //extern size_t bin_console16_len;
+
+vfs_stream_t console_stdout_stream;
+vfs_stream_t* console_stdout()
+{
+	return &console_stdout_stream;
+}
+
+static uint console_vfs_read(UNUSED void* state, UNUSED uint len, UNUSED void* buffer)
+{
+	return 0;
+}
+
+static uint console_vfs_write(UNUSED void* state, uint len, void* buffer)
+{
+	for(uint i = 0; i < len; i++)
+	{
+		if(((char*)buffer)[i] == 0)
+		{
+			kprint(buffer);
+			return len;
+		}
+	}
+	char* new = (char*)kmalloc(len + 1);
+	memcpy(new, buffer, len);
+	new[len] = 0;
+	kprint(buffer);
+	return len;
+}
+
+static void console_vfs_seek(UNUSED void* state, UNUSED int offset, UNUSED vfs_seek_t seek) { }
+static void console_vfs_close(UNUSED void* state) { }
 
 static void console_cursor(uint col, uint row)
 {
@@ -28,6 +62,10 @@ static void console_cursor(uint col, uint row)
 void console_init()
 {
 	console_cursor(col, row);
+	console_stdout_stream.read = console_vfs_read;
+	console_stdout_stream.write = console_vfs_write;
+	console_stdout_stream.seek = console_vfs_seek;
+	console_stdout_stream.close = console_vfs_close;
 }
 
 void console_gotoxy(uint x, uint y)

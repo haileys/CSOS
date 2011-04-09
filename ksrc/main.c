@@ -18,17 +18,7 @@
 #include "trap.h"
 #include "paging.h"
 
-gdtr_t* get_gdt();
-void switch_to_user_mode();
-
-static void ring3_helloworld(uint interrupt, uint error)
-{
-	interrupt = interrupt;
-	error = error;
-	kprintf("EAX = %x\n", task_current()->tss.eax);
-}
-
-int kmain(struct multiboot_info* mbd, unsigned int magic)
+void kmain(struct multiboot_info* mbd, unsigned int magic)
 {
 	if(magic != 0x2BADB002)
 	{
@@ -67,24 +57,16 @@ int kmain(struct multiboot_info* mbd, unsigned int magic)
 	vfs_init(fat_vfs(boot_drive, &part));
 	kprint("Ok.\n");
 	
-	
-	subscribe_isr(0x80, ring3_helloworld);
-	idt_set_privilege(0x80, 3);
-	
-	char buff[4096];
-	
-	vfs_readfile("/a.bin", 0, vfs_size("/a.bin"), buff);
-	task_create(4096, buff, 4096);
-	
-	vfs_readfile("/b.bin", 0, vfs_size("/b.bin"), buff);
-	task_create(4096, buff, 4096);
+	uint init_size = vfs_size("/init.bin");
+	char* buff = kmalloc(((init_size + 4095) / 4096) * 4096);
+	vfs_readfile("/init.bin", 0, init_size, buff);
+	task_create(init_size, buff, 4096);
+	kfree(buff);
 	
 	cli();
 	idt_register_handler(32, (uint)task_switch);
 	sti();
 	
-	while(true)
-	{
-		__asm__("hlt");
-	}
+	__asm__("hlt");
+	panic("init exited");
 }

@@ -42,6 +42,10 @@ static void trap_handler(uint interrupt, uint error)
 	uint cr2;
 	__asm__("mov eax, cr2" : "=a"(cr2));
 	kprintf("TRAP: %s, %d\n", traps[interrupt], interrupt == 14 ? cr2 : error);
+	if(interrupt == TRAP_PAGE_FAULT)
+	{
+		panic("page fault.");
+	}
 }
 
 void trap_init()

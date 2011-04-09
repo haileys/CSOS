@@ -74,6 +74,9 @@ void _kfree(void* ptr, char* file, uint line)
 void _kfree(void* ptr)
 #endif
 {
+	#ifdef MALLOC_PRINT_DEBUG
+		kprintf("Freeing from 0x%x on %s:%d... ", ptr, file, line);
+	#endif
 	char* begin = ((char*)ptr) - 4;
 	size_t len = *(size_t*)begin;
 	char* end = begin + len;
@@ -98,6 +101,7 @@ void _kfree(void* ptr)
 	uint c = free_slot;
 	while(mm_fix_chunk(c, &c)) ;
 	#ifdef MALLOC_PRINT_DEBUG
+		kprintf("freed.\n", len, file, line);
 	file = file;
 	line = line;
 	#endif

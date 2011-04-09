@@ -3,17 +3,25 @@ extern isr_dispatch
 extern idt_register_handler
 extern panic
 extern panicf
+extern kprintf
 
-%define WITH_ERROR
+%define WITH_ERROR push eax
 
 %macro isr 1-2 push dword 0
 
 	jmp isr_%1.fin
 	isr_%1:
+		mov [.eax], eax
+		mov eax, [esp]
+		mov [.err], eax
+		mov eax, [.eax]
 		pusha
+		mov eax, [.err]
 		%2
 		push dword %1
 		jmp isr_main
+	.eax dd 0
+	.err dd 0
 	.fin:
 	push isr_%1
 	push dword %1
@@ -58,7 +66,7 @@ asm_isr_init:
 	isr 14, WITH_ERROR
 	isr 15
 	isr 16
-	isr 17
+	isr 17, WITH_ERROR
 	isr 18
 	isr 19
 

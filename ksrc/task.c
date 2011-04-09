@@ -51,6 +51,7 @@ void task_init(uint base_physical, uint high_memory)
 	gdt_set_entry(0x88, &task_seg_raw);
 	
 	idt_register_handler(0x80, (uint)syscall_isr);
+	idt_set_privilege(0x80, 3);
 }
 
 uint alloc_page()
@@ -98,22 +99,23 @@ task_t* task_create(uint size, void* code, uint stack_size)
 	uint total_pages = stack_pages + codedata_pages;
 	uint total_dir_entries = (total_pages + 1023) / 1024;
 	task->tss.cr3 = (uint)(task->page_directory = (uint*)alloc_page());
-	memcpy(task->page_directory, page_directory, 4096);
+	memset(task->page_directory, 0, 4096);
+	memcpy(task->page_directory, page_directory, 4 /* copy only first page directory (4MB) of ram. this is what the kernel will be using */);
 	for(uint i = 0; i < total_dir_entries; i++)
 	{
-		task->page_directory[(0x10000000 / (4096 * 1024)) + i] = alloc_page() | 1 | 2 | 4;
+		task->page_directory[((0x10000000 / 4096) / 1024) + i] = alloc_page() | 1 | 2 | 4;
 	}
 	for(uint i = 0; i < total_pages; i++)
 	{
 		uint dir = i / 1024;
-		uint* table = (uint*)(task->page_directory[dir + (0x10000000 / 4096 / 1024)] & 0xfffff000);
+		uint* table = (uint*)(task->page_directory[dir + ((0x10000000 / 4096) / 1024)] & 0xfffff000);
 		uint phys = alloc_page();
 		table[i % 1024] = phys | 1 | 2 | 4;
 		if(i * 4096 < size)
 			memcpy((void*)phys, (char*)code + (4096 * i), 4096);
 	}
 	
-	task->state = SLEEPING;
+	task->state = RUNNING;
 	task->tss.ss0 = 0x10; // kernel stack segment
 	task->tss.esp0 = (uint)task->kernel_stack + 8192 - 4;
 	task->tss.iopb = 0; // don't let it I/O anywhere
@@ -134,7 +136,38 @@ task_t* task_create(uint size, void* code, uint stack_size)
 	task->pid = pid;
 	tasks[pid] = task;
 	
+	memset(task->fds, 0, sizeof(vfs_stream_t*) * MAX_FDS);
+	task->fds[1 /* stdout */] = console_stdout();
+	
 	return task;
+}
+void task_kill_and_free(task_t* task)
+{
+	task->state = KILLED;
+	for(uint i = 0; i < MAX_FDS; i++)
+	{
+		if(task->fds[i])
+			task->fds[i]->close(task->fds[i]->state);
+	}
+	// work through page directory starting at 0x10000000 freeing pages
+	for(uint dir_i = 0x10000000 / 4096 / 1024; i < 1024; i++)
+	{
+		if(!(task->page_directory[dir_i] | 1))
+		{
+			// page directory entry not in use? skip
+			continue;
+		}
+		uint* table = (uint*)(task->page_directory[dir_i] | 0xfffff000);
+		for(uint tbl_i = 0; i < 1024; i++)
+		{
+			if(table[tbl_i] | 1)
+				free_page(table[tbl_i] & 0xfffff000);
+		}
+		free_page((uint)table);
+	}
+	free_page(task->page_directory);
+	
+	kfree(task);
 }
 
 void task_switch_isr(uint interrupt, uint error)
@@ -148,7 +181,7 @@ uint task_find_next(uint t)
 {
 	for(uint i = 1; i < MAX_TASKS; i++)
 	{
-		if(tasks[(i + t) % MAX_TASKS] != NULL)
+		if(tasks[(i + t) % MAX_TASKS] != NULL && tasks[(i + t) % MAX_TASKS]->state == RUNNING)
 			return (i + t) % MAX_TASKS;
 	}
 	return t;

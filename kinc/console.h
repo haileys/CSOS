@@ -2,6 +2,7 @@
 #define CONSOLE_H
 
 #include "stddef.h"
+#include "fs/vfs.h"
 
 typedef enum color
 {
@@ -23,6 +24,8 @@ typedef enum color
 	WHITE = 15,
 }
 color_t;
+
+vfs_stream_t* console_stdout();
 
 void kprint(char* str);
 void kprintc(color_t bg, color_t fg, char* str);

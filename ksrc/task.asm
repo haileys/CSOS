@@ -9,10 +9,9 @@ global task_switch
 
 %define MAX_TASKS 16 ; must be the same as in task.c
 
-; this is an interrupt.
+
 task_switch:
 	cli
-	
 	; temporarily save registers out of the way while we load up task to store to
 	mov [.eax], eax
 	mov [.ebx], ebx
