@@ -94,7 +94,9 @@ image:
 	sudo umount mnt
 	sudo rm -rf mnt
 
-all: assembly usermode util custom
+all:
+	make -C user/pdclib
+	make assembly usermode util custom
 	@echo "\n\n\n"
 	@echo Now building the kernel
 	@echo "\n\n\n"
