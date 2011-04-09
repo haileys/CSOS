@@ -123,7 +123,7 @@ task_t* task_create(uint size, void* code, uint stack_size)
 	task->tss.cs = 0x80 | 3;
 	task->tss.ds = task->tss.ss = task->tss.es = task->tss.fs = task->tss.gs = 0x88 | 3;
 	__asm__("pushf\npop eax" : "=a"(task->tss.eflags));
-	//task->tss.eflags |= 0x200; // interrupts enabled
+	task->tss.eflags |= 0x200; // interrupts enabled
 	task->tss.eip = 0x10000000;
 	
 	task->tss.esp = 0x10000000 + total_pages * 4096 - 4;
@@ -149,8 +149,12 @@ void task_kill_and_free(task_t* task)
 		if(task->fds[i])
 			task->fds[i]->close(task->fds[i]->state);
 	}
+	if(task == task_current())
+	{
+		__asm__("mov cr3, eax" :: "a"(&page_directory));
+	}
 	// work through page directory starting at 0x10000000 freeing pages
-	for(uint dir_i = 0x10000000 / 4096 / 1024; i < 1024; i++)
+	for(uint dir_i = 0x10000000 / 4096 / 1024; dir_i < 1024; dir_i++)
 	{
 		if(!(task->page_directory[dir_i] | 1))
 		{
@@ -158,14 +162,14 @@ void task_kill_and_free(task_t* task)
 			continue;
 		}
 		uint* table = (uint*)(task->page_directory[dir_i] | 0xfffff000);
-		for(uint tbl_i = 0; i < 1024; i++)
+		for(uint tbl_i = 0; tbl_i < 1024; tbl_i++)
 		{
 			if(table[tbl_i] | 1)
 				free_page(table[tbl_i] & 0xfffff000);
 		}
 		free_page((uint)table);
 	}
-	free_page(task->page_directory);
+	free_page((uint)task->page_directory);
 	
 	kfree(task);
 }
@@ -179,12 +183,13 @@ void task_switch_isr(uint interrupt, uint error)
 
 uint task_find_next(uint t)
 {
-	for(uint i = 1; i < MAX_TASKS; i++)
+	for(uint i = 1; i <= MAX_TASKS; i++)
 	{
 		if(tasks[(i + t) % MAX_TASKS] != NULL && tasks[(i + t) % MAX_TASKS]->state == RUNNING)
 			return (i + t) % MAX_TASKS;
 	}
-	return t;
+	panic("no tasks running");
+	return 0;
 }
 
 void task_install_next_tss(uint t)

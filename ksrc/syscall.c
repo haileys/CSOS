@@ -4,6 +4,7 @@
 #include "panic.h"
 #include "fs/vfs.h"
 #include "paging.h"
+#include "idt.h"
 
 static void(*syscall_vectors[])() = {
 	// 0x00
@@ -50,10 +51,10 @@ void sys_exit(__attribute__((unused)) regs_t* registers)
 	// we can still use it of course, but we don't have the memory region to ourselves anymore.
 	// we'll temporarily disable interrupts and GTFO
 	cli();
-	task_kill_and_free(task_current());
+	//task_kill_and_free(task_current());
 	current_task = 0xffffffff; // magic value that indicates to the switcher that there is no valid task running.
 	
-	__asm__("int 32"); // trigger a task switch
+	__asm__("jmp task_switch"); // trigger a task switch
 }
 void sys_kill(__attribute__((unused)) regs_t* registers)
 {
