@@ -20,6 +20,7 @@ int main()
 	}
 	while(pid != 0);
 	write(stdout, bptr, len);
+    
 	write(stdout, "\n", 1);
 	
 //	write(stdout, &pid, 1);

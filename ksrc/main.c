@@ -20,7 +20,7 @@
 
 void kmain(struct multiboot_info* mbd, unsigned int magic)
 {
-	if(magic != 0x2BADB002)
+	if(magic != MULTIBOOT_BOOTLOADER_MAGIC)
 	{
 		panic("Multiboot did not pass correct magic number");
 	}
@@ -58,9 +58,8 @@ void kmain(struct multiboot_info* mbd, unsigned int magic)
 	kprint("Ok.\n");
 	
 	uint init_size = vfs_size("/init.bin");
-	char* buff = kmalloc(((init_size + 4095) / 4096) * 4096);
+	char* buff = kmalloc(((init_size + PAGE_SIZE-1) / PAGE_SIZE) * PAGE_SIZE);
 	vfs_readfile("/init.bin", 0, init_size, buff);
-	
 	task_create(init_size, buff, 4096);
 //	task_create(init_size, buff, 4096);
 	

@@ -1,0 +1,10 @@
+build/kernel.sys
+util/bin2nasm
+util/inject_symbols
+
+*.o
+*.bin
+kbin/*
+
+hdd.img
+hdd.base.img.old

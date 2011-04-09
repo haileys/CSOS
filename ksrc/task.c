@@ -36,8 +36,8 @@ task_t* task_get(uint pid)
 void task_init(uint base_physical, uint high_memory)
 {
 	user_base = base_physical;
-	page_base = base_physical / 4096;
-	total_pages = ((high_memory * 1024) - base_physical) / 4096;
+	page_base = base_physical / PAGE_SIZE;
+	total_pages = (high_memory * 1024 - base_physical) / PAGE_SIZE;
 	kprintf("Total pages: %d\n", total_pages);
 	pagemap = (uchar*)kmalloc(total_pages / 8);
 	memset(pagemap, 0, total_pages / 8);
@@ -71,7 +71,7 @@ uint alloc_page()
 				continue;
 			
 			pagemap[i] |= 1 << j;
-			return (i * 8 + j + page_base) << 12;
+			return (i * 8 + j + page_base) * PAGE_SIZE;
 		}
 	}
 	panic("No free pages");
@@ -79,8 +79,9 @@ uint alloc_page()
 }
 void free_page(uint page)
 {
-	page >>= 12;
-	
+	page /= PAGE_SIZE;
+	uint pdiv = page/8, pmod = page%8;
+
 	if(page < page_base || page >= total_pages + page_base)
 		panic("Freeing non-existent page");
 		
@@ -89,15 +90,18 @@ void free_page(uint page)
 	if(((pagemap[page / 8] >> (page % 8)) & 1) == 0)
 		panicf("Freeing freed page: %x (%x), pagemap %x", page, page << 12, pagemap[page / 8] & 0xff);
 		
-	pagemap[page / 8] &= ~(1 << (page % 8));
+	pagemap[pdiv] &= ~(1 << pmod);
 }
+
 task_t* task_create(uint size, void* code, uint stack_size)
 {
-	if(num_tasks == MAX_TASKS)
+ 	if(num_tasks == MAX_TASKS) {
+ 		kprintf("Failed to create a task");
 		return NULL;
+	}
 		
-	uint stack_pages = (stack_size + 4095) / 4096;
-	uint codedata_pages = (size + 4095) / 4096;
+	uint stack_pages = (stack_size + PAGE_SIZE-1) / PAGE_SIZE;
+	uint codedata_pages = (size + PAGE_SIZE-1) / PAGE_SIZE;
 	
 	task_t* task = (task_t*)kmalloc(sizeof(task_t));
 	memset(task, 0, sizeof(task_t));
@@ -105,20 +109,20 @@ task_t* task_create(uint size, void* code, uint stack_size)
 	uint total_pages = stack_pages + codedata_pages;
 	uint total_dir_entries = (total_pages + 1023) / 1024;
 	task->tss.cr3 = (uint)(task->page_directory = (uint*)alloc_page());
-	memset(task->page_directory, 0, 4096);
+	memset(task->page_directory, 0, PAGE_SIZE);
 	memcpy(task->page_directory, page_directory, 4 /* copy only first page directory (4MB) of ram. this is what the kernel will be using */);
 	for(uint i = 0; i < total_dir_entries; i++)
 	{
-		task->page_directory[((0x10000000 / 4096) / 1024) + i] = alloc_page() | 1 | 2 | 4;
+		task->page_directory[((0x10000000 / PAGE_SIZE) / 1024) + i] = alloc_page() | 1 | 2 | 4;
 	}
 	for(uint i = 0; i < total_pages; i++)
 	{
 		uint dir = i / 1024;
-		uint* table = (uint*)(task->page_directory[dir + ((0x10000000 / 4096) / 1024)] & 0xfffff000);
+		uint* table = (uint*)(task->page_directory[dir + ((0x10000000 / PAGE_SIZE) / 1024)] & 0xfffff000);
 		uint phys = alloc_page();
 		table[i % 1024] = phys | 1 | 2 | 4;
-		if(i * 4096 < size)
-			memcpy((void*)phys, (char*)code + (4096 * i), 4096);
+		if(i * PAGE_SIZE < size)
+			memcpy((void*)phys, (char*)code + (PAGE_SIZE * i), PAGE_SIZE);
 	}
 	
 	task->state = RUNNING;
@@ -132,7 +136,7 @@ task_t* task_create(uint size, void* code, uint stack_size)
 	task->tss.eflags |= 0x200; // interrupts enabled
 	task->tss.eip = 0x10000000;
 	
-	task->tss.esp = 0x10000000 + total_pages * 4096 - 4;
+	task->tss.esp = 0x10000000 + total_pages * PAGE_SIZE - 4;
 	
 	// find free pid
 	uint pid = 0;
@@ -147,6 +151,7 @@ task_t* task_create(uint size, void* code, uint stack_size)
 	
 	return task;
 }
+
 task_t* task_dup(task_t* task)
 {
 	if(num_tasks == MAX_TASKS)
@@ -203,6 +208,7 @@ task_t* task_dup(task_t* task)
 	
 	return copy;
 }
+
 void task_kill_and_free(task_t* task)
 {
 	if(task->state == KILLED)
@@ -219,7 +225,7 @@ void task_kill_and_free(task_t* task)
 		__asm__("mov cr3, eax" :: "a"(&page_directory));
 	}
 	// work through page directory starting at 0x10000000 freeing pages
-	for(uint dir_i = 0x10000000 / 4096 / 1024; dir_i < 1024; dir_i++)
+	for(uint dir_i = 0x10000000 / PAGE_SIZE / 1024; dir_i < 1024; dir_i++)
 	{
 		if(!(task->page_directory[dir_i] & 1))
 		{

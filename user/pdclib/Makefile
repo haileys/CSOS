@@ -28,7 +28,7 @@ PATCHFILES1 := $(shell ls platform/csos/functions/_PDCLIB/*.c)
 PATCHFILES2 := $(shell ls platform/csos/functions/stdlib/*.c)
 
 WARNINGS := -Wall -Wextra -pedantic -Wno-unused-parameter -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline -Wno-long-long -Wconversion -fno-builtin 
-CFLAGS := -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -g -std=c99 -I./internals $(WARNINGS) $(USERFLAGS)
+CFLAGS := -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -g -std=c99 -I./internals $(WARNINGS) $(USERFLAGS) -m32
 
 .PHONY: all clean srcdist bindist test tests testdrivers regtests regtestdrivers todos fixmes find links unlink help
 
