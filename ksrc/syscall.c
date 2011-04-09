@@ -31,10 +31,9 @@ void syscall_handler(regs_t* registers)
 {
 	if(registers->eax >= syscall_max)
 	{
-		kprintf("Unknown syscall %x\n", registers->eax);
+		kprintf("[#%d] Unknown syscall %x\n", task_current()->pid, registers->eax);
 		return;
 	}
-	kprintf("[syscall] %x\n", registers->eax);
 	syscall_vectors[registers->eax](registers);
 }
 

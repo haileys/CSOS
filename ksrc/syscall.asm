@@ -5,6 +5,7 @@ extern page_directory
 
 syscall_isr:
 	cli
+	mov [.saved_esp], esp
 	pusha
 	mov eax, 0
 	mov [multitasking_enabled], eax
@@ -25,7 +26,9 @@ syscall_isr:
 	mov fs, ax
 	mov es, ax
 	
+	push [.saved_esp]
 	push esp
+	
 	call syscall_handler
 	add esp, 4
 	
@@ -42,3 +45,4 @@ syscall_isr:
 	popa
 	iret
 	.saved_cr3 dd 0
+	.saved_esp dd 0

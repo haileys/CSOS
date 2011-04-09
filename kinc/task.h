@@ -105,6 +105,19 @@ typedef struct regs
 }
 __attribute__((__packed__)) regs_t;
 
+typedef struct interrupt_stack
+{
+	uint ss;
+	uint esp;
+	uint eflags;
+	uint cs;
+	uint eip;
+}
+__attribute__((__packed__)) interrupt_stack_t;
+
+extern uint current_task;
+extern uint multitasking_enabled;
+
 task_t* task_get(uint pid);
 void task_init(uint base_physical, uint high_memory);
 uint alloc_page();
