@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rm kbin/*
+rm kbin/* -f
 
 for f in $(find build | grep "/\."); do
 	rm $f
@@ -71,7 +71,7 @@ ld -T kernel_linker.ld -o build/kernel.sys kbin/*.o
 gcc -std=c99 -o util/inject_symbols util/inject_symbols.c
 perl util/find_symbols.pl build/kernel.sys | util/inject_symbols build/kernel.sys
 
-HDDIMG=ramdrive/hdd.img
+HDDIMG=hdd.img
 
 dd if=/dev/zero of=$HDDIMG bs=33546240 count=1 status=noxfer &>/dev/null
 
@@ -82,11 +82,13 @@ parted --script $HDDIMG set 1 boot on
 
 rm -rf mnt
 mkdir mnt
-mount -o loop,offset=512 $HDDIMG mnt
-cp -r build/* mnt
-umount mnt
-rm -rf mnt
+sudo chmod -R 0777 mnt
+sudo mount -o loop,offset=512 $HDDIMG mnt
+sudo chmod -R 0777 mnt
+sudo cp -r build/* mnt
+sudo umount mnt
+sudo rm -rf mnt
 
-grub --device-map=/dev/null --batch < grubscript &> /dev/null
+grub --device-map=/dev/null --batch < grubscript #&> /dev/null
 
 #gzip -c -9 $HDDIMG > hdd.img.gz
