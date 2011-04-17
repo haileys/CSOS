@@ -7,7 +7,7 @@ USERINCLUDES=-I./uinc/
 USERCFLAGS=${USERINCLUDES} ${CFLAGS}
 
 assembly:
-	nasm -f elf -o kbin/aaa_loader_asm.o ksrc/loader.asm
+	nasm -f elf -o kbin/aaa_loader_asm_o ksrc/loader.asm
 	nasm -f elf -o kbin/helper_asm.o ksrc/helper.asm
 	nasm -f elf -o kbin/panic_asm.o ksrc/panic.asm
 	nasm -f elf -o kbin/isrs_asm.o ksrc/isrs.asm
@@ -47,7 +47,7 @@ custom:
 kernel:
 	make -C ksrc kernel CFLAGS="${KCFLAGS}"
 # Link
-	ld -T kernel_linker.ld -o build/kernel.sys ksrc/*.o kbin/*.o
+	ld -T kernel_linker.ld -o build/kernel.sys kbin/*.o ksrc/*.o
 # Inject ktrace symbols @TODO: improve
 	gcc -std=c99 -o util/inject_symbols util/inject_symbols.c
 	perl util/find_symbols.pl build/kernel.sys | util/inject_symbols build/kernel.sys
