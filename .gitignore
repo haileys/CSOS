@@ -1,0 +1,7 @@
+*.o
+build/kernel.sys
+util/bin2nasm
+util/inject_symbols
+Make.log
+hdd.img
+kbin/*

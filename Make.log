@@ -1,0 +1,39 @@
+make[1]: Entering directory `/home/evgeny/csos'
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/main.c -o kbin/main.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/console.c -o kbin/console.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/string.c -o kbin/string.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/io.c -o kbin/io.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/util.c -o kbin/util.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/gdt.c -o kbin/gdt.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/idt.c -o kbin/idt.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/io.c -o kbin/io.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/panic.c -o kbin/panic.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/kmalloc.c -o kbin/kmalloc.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/realmode.c -o kbin/realmode.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/ata.c -o kbin/ata.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/kb.c -o kbin/kb.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/part.c -o kbin/part.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/fs/fat.c -o kbin/fs_fat.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/fs/vfs.c -o kbin/fs_vfs.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/task.c -o kbin/task.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/trap.c -o kbin/trap.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/paging.c -o kbin/paging.o
+gcc -iquote kinc -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel ksrc/syscall.c -o kbin/syscall.o
+ld -T kernel_linker.ld -o build/kernel.sys kbin/*.o
+gcc -std=c99 -o util/inject_symbols util/inject_symbols.c
+perl util/find_symbols.pl build/kernel.sys | util/inject_symbols build/kernel.sys
+dd if=/dev/zero of=hdd.img bs=33546240 count=1 status=noxfer
+parted --script hdd.img mklabel msdos 2> /dev/null
+parted --script hdd.img mkpartfs primary fat16 0 31 2> /dev/null
+Warning: The resulting partition is not properly aligned for best performance.
+parted --script hdd.img mkfs 1 fat16 2> /dev/null
+parted --script hdd.img set 1 boot on
+bash -c 'if [[ ! -x mnt ]]; then mkdir mnt --mode=0777; \
+		else sudo umount mnt; fi; exit 0'
+sudo mount -o loop,offset=512 hdd.img mnt
+sudo cp -r build/* mnt
+bash -c 'fuser -a mnt; exit 0' # DEBUGGING
+sudo umount mnt
+sudo rm -rf mnt
+grub --device-map=/dev/null --batch < grubscript > /dev/null
+make[1]: Leaving directory `/home/evgeny/csos'
