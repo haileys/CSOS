@@ -45,7 +45,7 @@ custom:
 	rm kbin/tmp.asm
 
 kernel:
-	cd ksrc; make kernel KCFLAGS="${KCFLAGS}" CFLAGS="${KCFLAGS}"
+	make -C ksrc kernel CFLAGS="${KCFLAGS}"
 # Link
 	ld -T kernel_linker.ld -o build/kernel.sys ksrc/*.o kbin/*.o
 # Inject ktrace symbols @TODO: improve
@@ -70,7 +70,7 @@ image:
 	sudo umount mnt
 	sudo rm -rf mnt
 # install bootloader
-	grub --device-map=/dev/null --batch < grubscript > /dev/null
+	grub --device-map=/dev/null --batch < grubscript #> /dev/null
 
 all: assembly usermode util custom
 	@echo "\n\n\n"
