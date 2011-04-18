@@ -20,7 +20,7 @@
 
 void kmain(struct multiboot_info* mbd, unsigned int magic)
 {
-	if(magic != 0x2BADB002)
+	if(magic != MULTIBOOT_BOOTLOADER_MAGIC)
 	{
 		panic("Multiboot did not pass correct magic number");
 	}

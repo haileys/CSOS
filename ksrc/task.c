@@ -68,7 +68,7 @@ uint alloc_page()
 				continue;
 			
 			pagemap[i] |= 1 << j;
-			return (i * 8 + j + page_base) << 12;
+			return (i * 8 + j + page_base) * PAGE_SIZE;
 		}
 	}
 	panic("No free pages");
@@ -76,23 +76,27 @@ uint alloc_page()
 }
 void free_page(uint page)
 {
-	page >>= 12;
-	
+	page /= PAGE_SIZE;
+	uint pdiv = page/8, pmod = page%8;
+
 	if(page < page_base || page >= total_pages + page_base)
 		panic("Freeing non-existent page");
 		
-	if(((pagemap[page / 8] >> (page % 8)) & 1) == 0)
+	if(((pagemap[pdiv] >> pmod) & 1) == 0)
 		panic("Freeing freed page");
 		
-	pagemap[page / 8] &= ~(1 << (page % 8));
+	pagemap[pdiv] &= ~(1 << pmod);
 }
+
 task_t* task_create(uint size, void* code, uint stack_size)
 {
-	if(num_tasks == MAX_TASKS)
+ 	if(num_tasks == MAX_TASKS) {
+ 		kprintf("Failed to create a task");
 		return NULL;
+	}
 		
-	uint stack_pages = (stack_size + 4095) / PAGE_SIZE;
-	uint codedata_pages = (size + 4095) / PAGE_SIZE;
+	uint stack_pages = (stack_size + PAGE_SIZE-1) / PAGE_SIZE;
+	uint codedata_pages = (size + PAGE_SIZE-1) / PAGE_SIZE;
 	
 	task_t* task = (task_t*)kmalloc(sizeof(task_t));
 	memset(task, 0, sizeof(task_t));
@@ -142,6 +146,7 @@ task_t* task_create(uint size, void* code, uint stack_size)
 	
 	return task;
 }
+
 void task_kill_and_free(task_t* task)
 {
 	task->state = KILLED;

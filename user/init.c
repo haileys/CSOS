@@ -11,7 +11,7 @@ uint strlen(char* str)
 int main()
 {
 	char* msg = "Hello world from init! I am process number: ";
-	write(stdout, "Hello world from init! I am process number: ", strlen(msg));
+	write(stdout, msg, strlen(msg));
 	
 	uint pid = get_pid();
 	char buff[16];
