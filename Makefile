@@ -59,6 +59,8 @@ HDDIMG=hdd.img
 HDD_BASE_IMG=hdd.base.img
 
 bootstrap-image:
+	# Ensure that grub exists
+	which grub
 	# reset the image
 	dd if=/dev/zero of=${HDDIMG} bs=33546240 count=1 status=noxfer
 	parted --script ${HDDIMG} mklabel msdos 2> /dev/null
