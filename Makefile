@@ -7,7 +7,7 @@ USERINCLUDES=-I./uinc/
 USERCFLAGS=${USERINCLUDES} ${CFLAGS}
 
 assembly:
-	nasm -f elf -o kbin/aaa_loader_asm_o ksrc/loader.asm
+	nasm -f elf -o kbin/aaa_loader_asm.o ksrc/loader.asm
 	nasm -f elf -o kbin/helper_asm.o ksrc/helper.asm
 	nasm -f elf -o kbin/panic_asm.o ksrc/panic.asm
 	nasm -f elf -o kbin/isrs_asm.o ksrc/isrs.asm
