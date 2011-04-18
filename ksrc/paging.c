@@ -13,12 +13,12 @@ void paging_init(uint mb)
 	memset(page_directory, 0, sizeof(uint) * 1024);
 	for(uint dir_i = 0; dir_i < (mb + 3) / 4; dir_i++)
 	{
-		uint* table = (uint*)(0x00400000 + (4096 * dir_i));
+		uint* table = (uint*)(0x00400000 + (PAGE_SIZE * dir_i));
 		page_directory[dir_i] = ((uint)table & 0xfffff000) | 1;
 		
 		for(uint tbl_i = 0; tbl_i < 1024; tbl_i++)
 		{
-			table[tbl_i] = ((dir_i * 1024 + tbl_i) * 4096) | 1;
+			table[tbl_i] = ((dir_i * 1024 + tbl_i) * PAGE_SIZE) | 1;
 		}
 	}
 	
@@ -36,7 +36,7 @@ void paging_map(uint virtual, uint physical, bool user)
 	if(physical & 0xff)
 		panic("Physical address not page-aligned");
 	
-	virtual /= 4096;
+	virtual /= PAGE_SIZE;
 	uint dir_i = virtual / 1024;
 	uint tbl_i = virtual % 1024;
 	
@@ -44,7 +44,7 @@ void paging_map(uint virtual, uint physical, bool user)
 	
 	if(table[tbl_i] & 1)
 		panic("Tried to map already mapped page table entry");
-		
+	
 	table[tbl_i] = (physical & 0xfffff000) | 1 | 2 | (user ? 4 : 0);
 	
 	__asm__ volatile("mov cr3, eax" :: "a"(page_directory)); // invalidate TLB cache
@@ -55,7 +55,7 @@ void paging_unmap(uint virtual)
 	if(virtual & 0xfff)
 		panic("Virtual address not page-aligned");
 		
-	virtual /= 4096;
+	virtual /= PAGE_SIZE;
 	uint dir_i = virtual / 1024;
 	uint tbl_i = virtual % 1024;
 		
@@ -71,7 +71,7 @@ void paging_unmap(uint virtual)
 
 uint paging_virtual_to_physical(uint* page_directory, uint virtual)
 {
-	uint* table = (uint*)(page_directory[(virtual / 4096) / 1024] & 0xfffff000);
-	uint phys = table[(virtual / 4096) % 1024] & 0xfffff000;
+	uint* table = (uint*)(page_directory[(virtual / PAGE_SIZE) / 1024] & 0xfffff000);
+	uint phys = table[(virtual / PAGE_SIZE) % 1024] & 0xfffff000;
 	return phys | (virtual & 0xfff);
 }

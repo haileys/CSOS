@@ -1,3 +1,4 @@
+default: kernel
+
 kernel: main.o console.o string.o io.o util.o gdt.o idt.o io.o panic.o kmalloc.o realmode.o ata.o kb.o part.o task.o trap.o paging.o syscall.o 
-	gcc ${CFLAGS} fs/fat.c -o fs_fat.o
-	gcc ${CFLAGS} fs/vfs.c -o fs_vfs.o
+	make -C fs

@@ -1,10 +1,12 @@
+default: all
+
 clean:
 	rm kbin/* ubin/* ksrc/*.o -f
 
 CFLAGS=-std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel
-KCFLAGS=-iquote ../kinc ${CFLAGS}
-USERINCLUDES=-I./uinc/
-USERCFLAGS=${USERINCLUDES} ${CFLAGS}
+PWD=$(shell pwd)
+KCFLAGS=-iquote ${PWD}/kinc ${CFLAGS}
+USERCFLAGS=-I ${PWD}/uinc ${CFLAGS}
 
 assembly:
 	nasm -f elf -o kbin/aaa_loader_asm.o ksrc/loader.asm
@@ -44,18 +46,20 @@ custom:
 	nasm -f elf -o kbin/realmode_int.o kbin/tmp.asm
 	rm kbin/tmp.asm
 
-kernel:
-	make -C ksrc kernel CFLAGS="${KCFLAGS}"
+kernel: ksrc
+	make -C ksrc CFLAGS="${KCFLAGS}"
 # Link
-	ld -T kernel_linker.ld -o build/kernel.sys kbin/*.o ksrc/*.o
+	ld -T kernel_linker.ld -o build/kernel.sys kbin/*.o ksrc/*.o ksrc/fs/*.o
 # Inject ktrace symbols @TODO: improve
 	gcc -std=c99 -o util/inject_symbols util/inject_symbols.c
 	perl util/find_symbols.pl build/kernel.sys | util/inject_symbols build/kernel.sys
 
 
 HDDIMG=hdd.img
-image:
-# reset the disk image
+HDD_BASE_IMG=hdd.base.img
+
+bootstrap-image:
+	# reset the image
 	dd if=/dev/zero of=${HDDIMG} bs=33546240 count=1 status=noxfer
 	parted --script ${HDDIMG} mklabel msdos 2> /dev/null
 	parted --script ${HDDIMG} mkpartfs primary fat16 0 31 2> /dev/null
@@ -65,12 +69,25 @@ image:
 	bash -c 'if [[ ! -x mnt ]]; then mkdir mnt --mode=0777; \
 		else sudo umount mnt; fi; exit 0'
 	sudo mount -o loop,offset=512 ${HDDIMG} mnt
-	sudo cp -r build/* mnt
+	sudo cp -r boot mnt/
 	bash -c 'fuser -a mnt; exit 0' # DEBUGGING
 	sudo umount mnt
 	sudo rm -rf mnt
 # install bootloader
-	grub --device-map=/dev/null --batch < grubscript #> /dev/null
+	grub --device-map=/dev/null --batch < grubscript
+	mv ${HDD_BASE_IMG} ${HDD_BASE_IMG}.old
+	mv ${HDDIMG} ${HDD_BASE_IMG}
+
+image:
+	# copy all files onto the system
+	bash -c 'if [[ ! -x mnt ]]; then mkdir mnt --mode=0777; \
+		else sudo umount mnt; fi; exit 0'
+	cp ${HDD_BASE_IMG} ${HDDIMG}
+	sudo mount -o loop,offset=512 ${HDDIMG} mnt
+	sudo cp -r build/* mnt
+	bash -c 'fuser -a mnt; exit 0' # DEBUGGING
+	sudo umount mnt
+	sudo rm -rf mnt
 
 all: assembly usermode util custom
 	@echo "\n\n\n"
