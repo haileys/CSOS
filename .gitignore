@@ -6,3 +6,4 @@ Make.log
 hdd.img
 hdd.base.img.old
 kbin/*
+build/kernel.sys

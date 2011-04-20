@@ -1,12 +1,13 @@
 default: all
 
 clean:
-	rm kbin/* ubin/* ksrc/*.o -f
+	rm kbin/* ubin/* ksrc/*.o user/*.o -f
 
-CFLAGS=-std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel
+CFLAGS=-m32 -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel
 PWD=$(shell pwd)
-KCFLAGS=-iquote ${PWD}/kinc ${CFLAGS}
-USERCFLAGS=-I ${PWD}/uinc ${CFLAGS}
+KCFLAGS=-iquote $(PWD)/kinc $(CFLAGS)
+USERCFLAGS=-I $(PWD)/uinc $(CFLAGS)
+LDFLAGS=-melf_i386
 
 assembly:
 	nasm -f elf -o kbin/aaa_loader_asm.o ksrc/loader.asm
@@ -20,8 +21,8 @@ assembly:
 
 # Usermode crap
 usermode:
-	gcc ${USERCFLAGS} user/init.c -o ubin/init.o
-	ld -T user_linker.ld -o build/init.bin ubin/*.o
+	gcc $(USERCFLAGS) user/init.c -o ubin/init.o
+	ld -T user_linker.ld -o build/init.bin ubin/*.o $(LDFLAGS)
 
 util:
 	gcc -std=c99 -o util/bin2nasm util/bin2nasm.c
@@ -47,9 +48,9 @@ custom:
 	rm kbin/tmp.asm
 
 kernel: ksrc
-	make -C ksrc CFLAGS="${KCFLAGS}"
+	make -C ksrc CFLAGS="$(KCFLAGS)"
 # Link
-	ld -T kernel_linker.ld -o build/kernel.sys kbin/*.o ksrc/*.o ksrc/fs/*.o
+	ld -T kernel_linker.ld -o build/kernel.sys kbin/*.o ksrc/*.o ksrc/fs/*.o $(LDFLAGS)
 # Inject ktrace symbols @TODO: improve
 	gcc -std=c99 -o util/inject_symbols util/inject_symbols.c
 	perl util/find_symbols.pl build/kernel.sys | util/inject_symbols build/kernel.sys
@@ -62,30 +63,30 @@ bootstrap-image:
 	# Ensure that grub exists
 	which grub
 	# reset the image
-	dd if=/dev/zero of=${HDDIMG} bs=33546240 count=1 status=noxfer
-	parted --script ${HDDIMG} mklabel msdos 2> /dev/null
-	parted --script ${HDDIMG} mkpartfs primary fat16 0 31 2> /dev/null
-	parted --script ${HDDIMG} mkfs 1 fat16 2> /dev/null
-	parted --script ${HDDIMG} set 1 boot on
+	dd if=/dev/zero of=$(HDDIMG) bs=33546240 count=1 status=noxfer
+	parted --script $(HDDIMG) mklabel msdos 2> /dev/null
+	parted --script $(HDDIMG) mkpartfs primary fat16 0 31 2> /dev/null
+	parted --script $(HDDIMG) mkfs 1 fat16 2> /dev/null
+	parted --script $(HDDIMG) set 1 boot on
 # copy all files onto the system
 	bash -c 'if [[ ! -x mnt ]]; then mkdir mnt --mode=0777; \
 		else sudo umount mnt; fi; exit 0'
-	sudo mount -o loop,offset=512 ${HDDIMG} mnt
+	sudo mount -o loop,offset=512 $(HDDIMG) mnt
 	sudo cp -r boot mnt/
 	bash -c 'fuser -a mnt; exit 0' # DEBUGGING
 	sudo umount mnt
 	sudo rm -rf mnt
 # install bootloader
 	grub --device-map=/dev/null --batch < grubscript
-	mv ${HDD_BASE_IMG} ${HDD_BASE_IMG}.old
-	mv ${HDDIMG} ${HDD_BASE_IMG}
+	mv $(HDD_BASE_IMG) $(HDD_BASE_IMG).old
+	mv $(HDDIMG) $(HDD_BASE_IMG)
 
 image:
 	# copy all files onto the system
 	bash -c 'if [[ ! -x mnt ]]; then mkdir mnt --mode=0777; \
 		else sudo umount mnt; fi; exit 0'
-	cp ${HDD_BASE_IMG} ${HDDIMG}
-	sudo mount -o loop,offset=512 ${HDDIMG} mnt
+	cp $(HDD_BASE_IMG) $(HDDIMG)
+	sudo mount -o loop,offset=512 $(HDDIMG) mnt
 	sudo cp -r build/* mnt
 	bash -c 'fuser -a mnt; exit 0' # DEBUGGING
 	sudo umount mnt
