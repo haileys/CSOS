@@ -12,6 +12,9 @@ struct fat_vfs_state
 	fat_volume_t volume;
 };
 
+//#define KDEBUG(x...) { kprintf("%s:%d: ", __FILE__, __LINE__, __func__); kprintf(x); }
+#define KDEBUG(x...) {}
+
 bool fat_vfs_exists(struct fat_vfs_state* state, char* path);
 vfs_type_t fat_vfs_type(struct fat_vfs_state* state, char* path);
 size_t fat_vfs_size(struct fat_vfs_state* state, char* path);
@@ -27,18 +30,27 @@ static void fat_read_cached(struct fat_vfs_state* state)
 
 vfs_provider_t* fat_vfs(uchar bios_drive, partition_t* partition)
 {
+    KDEBUG("Entered fat_vfs\n");
+
 	vfs_provider_t* prov = (vfs_provider_t*)kmalloc(sizeof(vfs_provider_t));
 	struct fat_vfs_state* state = (struct fat_vfs_state*)kmalloc(sizeof(struct fat_vfs_state));
 	prov->state = state;
 	state->prov = prov;
 	partition_t* part = (partition_t*)kmalloc(sizeof(partition_t));
 	memcpy(part, partition, sizeof(partition_t));
+
+    KDEBUG("Past malloc() calls\n");
 	fat_init(bios_drive, part, &state->volume);
-	
+    KDEBUG("Returned from fat_init()\n");
+
+    KDEBUG("Setting state struct\n");
 	state->volume.root_entries = (fat_entry_t*)kmalloc(32 * state->volume.bpb.root_entry_count);
 	state->volume.fat = (short*)kmalloc(512 * state->volume.bpb.sectors_per_fat);
+
+    KDEBUG("About to read\n");
 	fat_read_cached(state);
 	
+    KDEBUG("Setting prov struct\n");
 	prov->fs_name = "FAT16";
 	prov->exists = (bool(*)(void*,char*))fat_vfs_exists;
 	prov->type = (vfs_type_t(*)(void*,char*))fat_vfs_type;

@@ -1,7 +1,7 @@
 default: all
 
 clean:
-	rm kbin/* ubin/* ksrc/*.o user/*.o -f
+	rm kbin/* ubin/* ksrc/*.o user/*.o ksrc/fs/*.o -f
 
 CFLAGS=-m32 -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel
 PWD=$(shell pwd)
@@ -47,7 +47,7 @@ custom:
 	nasm -f elf -o kbin/realmode_int.o kbin/tmp.asm
 	rm kbin/tmp.asm
 
-kernel: ksrc
+kernel:
 	make -C ksrc CFLAGS="$(KCFLAGS)"
 # Link
 	ld -T kernel_linker.ld -o build/kernel.sys kbin/*.o ksrc/*.o ksrc/fs/*.o $(LDFLAGS)
@@ -96,7 +96,8 @@ all: assembly usermode util custom
 	@echo "\n\n\n"
 	@echo Now building the kernel
 	@echo "\n\n\n"
-	make -j1 kernel image
+	make kernel
+	make image
 
 run:
 	bochs -qf bochslinux.bxrc
