@@ -12,6 +12,8 @@ extern kprintf
 	jmp isr_%1.fin
 	isr_%1:
 		mov [.eax], eax
+		mov ax, 0x10
+		mov ds, ax
 		mov eax, [esp]
 		mov [.err], eax
 		mov eax, [.eax]
@@ -42,6 +44,8 @@ isr_main:
 	.dont_send_other_clearance:
 	mov al, 0x20
 	out 0x20, al
+	mov ax, 0x8b
+	mov ds, ax
 	popa
 	sti
 	iret

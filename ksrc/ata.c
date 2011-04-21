@@ -69,15 +69,37 @@ bool ata_write_sector(uchar disk, uint lba, void* buffer)
 
 bool ata_read_sectors(uchar disk, uint lba, uint sectors, void* buffer)
 {
-	if(buffer == NULL)
-		panic("Attempt to read to a null buffer in ata_read_sectors");
-	// optimize later
-	for(uint i = 0; i < sectors; i++)
+	uint at_a_time = 64;
+	if(sectors > at_a_time)
 	{
-		if(!ata_read_sector(disk, lba + i, (char*)buffer + 512*i))
-			return false;
+		for(uint i = 0; i < sectors; i += at_a_time)
+		{
+			if(!ata_read_sectors(disk, lba + i, (sectors - i) > at_a_time ? at_a_time : sectors - i, (char*)buffer + (i * 512)))
+				return false;
+		}
+		return true;
 	}
-	return true;
+	struct lba_packet* packet = (struct lba_packet*)0x2000;
+	packet->size = 16;
+	packet->reserved = 0;
+	packet->sectors = sectors;
+	packet->dest_segment = 0x1000;
+	packet->dest_offset = 0x0000;
+	packet->lba_lo = lba;
+	packet->lba_hi = 0;
+	
+	*(uchar*)0x2010 = disk; // disk
+	*(uchar*)0x2011 = 0x42; // read
+	
+	real_exec(bin_ata16, bin_ata16_len);
+	
+	memcpy(buffer, (void*)0x10000, 512 * sectors);
+	
+	bool success = !(*(bool*)0x2000);
+	if(!success)
+		panicf("Read failed. LBA = %d, buffer = 0x%x", lba, buffer);
+		
+	return success;
 }
 
 bool ata_write_sectors(uchar disk, uint lba, uint sectors, void* buffer)

@@ -1,4 +1,4 @@
-device (hd0) ramdrive/hdd.img
+device (hd0) hdd.img
 root (hd0,0)
 setup (hd0,0)
 

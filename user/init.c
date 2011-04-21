@@ -1,17 +1,12 @@
 #include <csos.h>
-
-uint strlen(char* str)
-{
-	uint len = 0;
-	while(*str++)
-		len++;
-	return len;
-}
+#include <stdio.h>
+#include <string.h>
 
 int main()
 {
+	/*
 	char* msg = "Hello world from init! I am process number: ";
-	write(stdout, "Hello world from init! I am process number: ", strlen(msg));
+	write(stdout, msg, strlen(msg));
 	
 	uint pid = get_pid();
 	char buff[16];
@@ -25,4 +20,10 @@ int main()
 	}
 	while(pid != 0);
 	write(stdout, bptr, len);
+	write(stdout, "\n", 1);
+	
+//	write(stdout, &pid, 1);
+	*/
+	
+	printf("Hello world from init! I am process number: %d\n", get_pid());
 }

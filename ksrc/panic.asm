@@ -1,10 +1,13 @@
+use32
 global panic
 global symtable
 global get_symtable_addr
 extern kprintf
 extern panic_backtrace_step
 
-panic:	
+section .text
+
+panic:
 	push ss
 	push ds
 	push cs

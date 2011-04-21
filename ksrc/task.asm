@@ -7,8 +7,9 @@ extern task_install_next_tss
 extern task_find_next
 global task_switch
 
-%define MAX_TASKS 16 ; must be the same as in task.c
+%define TIME_SLICE 3
 
+which_slice dd 0
 
 task_switch:
 	cli
@@ -25,7 +26,18 @@ task_switch:
 	sti
 	iret
 	
+	mov eax, [which_slice]
+	cmp eax, TIME_SLICE
+	je .perform_switch
+	
+	inc eax
+	mov [which_slice], eax
+	sti
+	iret
+	
 	.perform_switch:
+	xor eax, eax
+	mov [which_slice], eax
 	
 	mov eax, [current_task]
 	; if current_task is 0xffffffff then that means that there is no current task and we shouldn't save back the registers
@@ -100,6 +112,7 @@ task_switch:
 	push eax
 	; EFLAGS:
 	mov eax, [ebx + 0x24]
+	or eax, 0x200
 	push eax
 	; CS:
 	xor eax, eax
@@ -126,7 +139,7 @@ task_switch:
 	mov al, 0x20
 	out 0x20, al
 	
-	mov ax, 0x90
+	mov ax, 0x93
 	ltr ax
 	
 	mov eax, [ebx + 0x28]
@@ -139,5 +152,6 @@ task_switch:
 	.ebx dd 0
 	.ecx dd 0
 	.edx dd 0
+	.switchmsg db "switching to task %d", 10, 0
 	.msg db "EIP: %x, CS: %x, EFLAGS: %x, ESP: %x, SS: %x", 0
 	.ping db "ping!", 0

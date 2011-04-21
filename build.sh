@@ -8,22 +8,24 @@ done
 
 CFLAGS="-std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel "
 KCFLAGS="-iquote kinc $CFLAGS $1"
-USERCFLAGS="-Iuinc $CFLAGS"
+USERCFLAGS="-Iuinc -Iuser/pdclib/includes -Iuser/pdclib/internals $CFLAGS"
 
 nasm -f elf -o kbin/aaa_loader_asm.o ksrc/loader.asm
 nasm -f elf -o kbin/helper_asm.o ksrc/helper.asm
-nasm -f elf -o kbin/panic_asm.o ksrc/panic.asm
+nasm -f elf -o kbin/aaa_panic_asm.o ksrc/panic.asm
 nasm -f elf -o kbin/isrs_asm.o ksrc/isrs.asm
 nasm -f elf -o kbin/task_asm.o ksrc/task.asm
 nasm -f elf -o kbin/syscall_asm.o ksrc/syscall.asm
 
 #build the CRT
-nasm -f elf -o user/crt.o user/crt/csos.asm
+nasm -f elf -o user/crt/crt_asm.o user/crt/csos.asm
+gcc $USERCFLAGS -Iuser/pdclib/internals/ user/crt/csos.c -o user/crt/crt_c.o
+#ar q user/crt.a user/crt/*.o
 
 #user mode crap
 	rm ubin/*
 	gcc $USERCFLAGS user/init.c -o ubin/init.o
-	ld -T user_linker.ld -o build/init.bin ubin/*.o
+	ld -T user_linker.ld -o build/init.bin ubin/*.o user/pdclib/functions/stdlib/*.o user/pdclib/functions/_PDCLIB/*.o user/pdclib/functions/stdio/*.o user/pdclib/functions/string/*.o user/crt/crt_c.o
 
 gcc -std=c99 -o util/bin2nasm util/bin2nasm.c
 # custom binaries to include in image!!
@@ -41,7 +43,7 @@ gcc -std=c99 -o util/bin2nasm util/bin2nasm.c
 	rm kbin/tmp.asm
 	
 	# int.bin
-	nasm -f bin -o kbin/realmode_int.bin ksrc/realmode/int.asm
+nasm -f bin -o kbin/realmode_int.bin ksrc/realmode/int.asm
 	util/bin2nasm int16 < kbin/realmode_int.bin > kbin/tmp.asm
 	nasm -f elf -o kbin/realmode_int.o kbin/tmp.asm
 	rm kbin/tmp.asm
@@ -71,7 +73,7 @@ ld -T kernel_linker.ld -o build/kernel.sys kbin/*.o
 gcc -std=c99 -o util/inject_symbols util/inject_symbols.c
 perl util/find_symbols.pl build/kernel.sys | util/inject_symbols build/kernel.sys
 
-HDDIMG=ramdrive/hdd.img
+HDDIMG=hdd.img
 
 dd if=/dev/zero of=$HDDIMG bs=33546240 count=1 status=noxfer &>/dev/null
 
@@ -82,10 +84,12 @@ parted --script $HDDIMG set 1 boot on
 
 rm -rf mnt
 mkdir mnt
-mount -o loop,offset=512 $HDDIMG mnt
-cp -r build/* mnt
-umount mnt
-rm -rf mnt
+sudo chmod -R 0777 mnt
+sudo mount -o loop,offset=512 $HDDIMG mnt
+sudo chmod 0777 mnt
+sudo cp -r build/* mnt
+sudo umount mnt
+sudo rm -rf mnt
 
 grub --device-map=/dev/null --batch < grubscript &> /dev/null
 

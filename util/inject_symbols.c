@@ -45,7 +45,7 @@ int main(int argc, char** argv)
 		int offset;
 		char symbol[28];
 		memset(symbol, 0, 28);
-		scanf("%x %s\n", &offset, &symbol);
+		scanf("%x %s\n", &offset, symbol);
 		*(int*)(buff + buffoffset) = offset;
 		memcpy(buff + buffoffset + 4, symbol, 28);
 		buffoffset += 32;
