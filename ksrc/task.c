@@ -9,8 +9,6 @@
 #include "console.h"
 #include "syscall.h"
 
-#define MAX_TASKS 16
-
 uint user_base;
 uint page_base;
 uint total_pages;
@@ -28,6 +26,11 @@ uint multitasking_enabled = 0;
 task_t* task_current()
 {
 	return tasks[current_task];
+}
+
+task_t* task_get(uint pid)
+{
+	return tasks[pid];
 }
 
 void task_init(uint base_physical, uint high_memory)
@@ -82,8 +85,10 @@ void free_page(uint page)
 	if(page < page_base || page >= total_pages + page_base)
 		panic("Freeing non-existent page");
 		
-	if(((pagemap[pdiv] >> pmod) & 1) == 0)
-		panic("Freeing freed page");
+	page -= page_base;
+		
+	if(((pagemap[page / 8] >> (page % 8)) & 1) == 0)
+		panicf("Freeing freed page: %x (%x), pagemap %x", page, page << 12, pagemap[page / 8] & 0xff);
 		
 	pagemap[pdiv] &= ~(1 << pmod);
 }
@@ -147,8 +152,68 @@ task_t* task_create(uint size, void* code, uint stack_size)
 	return task;
 }
 
+task_t* task_dup(task_t* task)
+{
+	if(num_tasks == MAX_TASKS)
+		return NULL;
+		
+	task_t* copy = (task_t*)kmalloc(sizeof(task_t));
+	memset(copy, 0, sizeof(task_t));
+	
+	copy->page_directory = (uint*)(copy->tss.cr3 = alloc_page());
+	memset(copy->page_directory, 0, 4096);
+	memcpy(copy->page_directory, task->page_directory, 4 /* copy only first page directory (4MB) of ram. this is what the kernel will be using */);
+	
+	for(uint dir_i = 0x10000000 / 4096 / 1024; dir_i < 1024; dir_i++)
+	{
+		if(task->page_directory[dir_i] & 1)
+		{
+			copy->page_directory[dir_i] = alloc_page() | (task->page_directory[dir_i] & 0xfff);
+			uint* copy_tbl = (uint*)(copy->page_directory[dir_i] & 0xfffff000);
+			uint* task_tbl = (uint*)(task->page_directory[dir_i] & 0xfffff000);
+			for(uint tbl_i = 0; tbl_i < 1024; tbl_i++)
+			{
+				if(task_tbl[tbl_i] & 1)
+				{
+					copy_tbl[tbl_i] = alloc_page() | (task_tbl[tbl_i] & 0xfff);
+					memcpy((uint*)(copy_tbl[tbl_i] & 0xfffff000), (uint*)(task_tbl[tbl_i] & 0xfffff000), 4096);
+				}
+			}
+		}
+	}
+	
+	copy->state = task->state;
+	copy->tss.ss0 = 0x10; // kernel stack segment
+	copy->tss.esp0 = (uint)copy->kernel_stack + 8192 - 4;
+	copy->tss.iopb = task->tss.iopb; // don't let it I/O anywhere
+	
+	copy->tss.cs = 0x80 | 3;
+	copy->tss.ds = copy->tss.ss = copy->tss.es = copy->tss.fs = copy->tss.gs = 0x88 | 3;
+	copy->tss.eflags = task->tss.eflags;
+	copy->tss.eip = task->tss.eip;
+	
+	copy->tss.esp = task->tss.esp;
+	
+	copy->exception_handler = task->exception_handler;
+	
+	// find free pid
+	uint pid = 0;
+	for(; pid < MAX_TASKS && tasks[pid] != NULL; pid++) ;
+	num_tasks++;
+	kprintf("Forked task with pid %d, parent task is %d\n", pid, task->pid);
+	copy->pid = pid;
+	tasks[pid] = copy;
+	
+	memcpy(copy->fds, task->fds, sizeof(vfs_stream_t*) * MAX_FDS);
+	
+	return copy;
+}
+
 void task_kill_and_free(task_t* task)
 {
+	if(task->state == KILLED)
+		return;
+		
 	task->state = KILLED;
 	for(uint i = 0; i < MAX_FDS; i++)
 	{
@@ -162,22 +227,27 @@ void task_kill_and_free(task_t* task)
 	// work through page directory starting at 0x10000000 freeing pages
 	for(uint dir_i = 0x10000000 / PAGE_SIZE / 1024; dir_i < 1024; dir_i++)
 	{
-		if(!(task->page_directory[dir_i] | 1))
+		if(!(task->page_directory[dir_i] & 1))
 		{
 			// page directory entry not in use? skip
 			continue;
 		}
-		uint* table = (uint*)(task->page_directory[dir_i] | 0xfffff000);
+		uint* table = (uint*)(task->page_directory[dir_i] & 0xfffff000);
 		for(uint tbl_i = 0; tbl_i < 1024; tbl_i++)
 		{
-			if(table[tbl_i] | 1)
+			if(table[tbl_i] & 1)
+			{
 				free_page(table[tbl_i] & 0xfffff000);
+			}
 		}
 		free_page((uint)table);
 	}
 	free_page((uint)task->page_directory);
 	
+	tasks[task->pid] = NULL;
 	kfree(task);
+	
+	num_tasks--;
 }
 
 void task_switch_isr(uint interrupt, uint error)
@@ -192,14 +262,17 @@ uint task_find_next(uint t)
 	for(uint i = 1; i <= MAX_TASKS; i++)
 	{
 		if(tasks[(i + t) % MAX_TASKS] != NULL && tasks[(i + t) % MAX_TASKS]->state == RUNNING)
+		{
+			//kprintf("--> %d, state: %d\n", (i + t) % MAX_TASKS, tasks[(i + t) % MAX_TASKS]->state);
 			return (i + t) % MAX_TASKS;
+		}
 	}
 	panic("no tasks running");
 	return 0;
 }
 
 void task_install_next_tss(uint t)
-{	
+{
 	gdt_entry_t task_seg;
 	memset(&task_seg, 0, sizeof(gdt_entry_t));
 	gdt_raw_entry_t task_seg_raw;
@@ -215,55 +288,6 @@ void task_install_next_tss(uint t)
 	((uchar*)&task_seg_raw)[5] = 0x89; // hack to set access byte.
 	gdt_set_entry(0x90, &task_seg_raw);
 }
-
-/*
-void task_switch()
-{
-	cli();
-	for(uint i = 0; i < MAX_TASKS; i++)
-	{
-		uint next_task = (current_task + i) % MAX_TASKS;
-		if(tasks[next_task] != NULL)
-			current_task = next_task;
-	}
-	gdt_entry_t task_seg;
-	memset(&task_seg, 0, sizeof(gdt_entry_t));
-	gdt_raw_entry_t task_seg_raw;
-	// setup TSS
-	task_seg.base = (uint)&tasks[current_task]->tss;
-	task_seg.limit = sizeof(tss_t);
-	task_seg.executable = true;
-	task_seg.accessed = true;
-	task_seg.bits32 = true;
-	task_seg.readwrite = false;
-	task_seg.privilege = 3;
-	gdt_encode(&task_seg, &task_seg_raw);
-	((uchar*)&task_seg_raw)[5] = 0x89; // hack to set access byte.
-	gdt_set_entry(0x90, &task_seg_raw);
-	gdt_flush();
-	
-	idt_entry_t syscall;
-	idt_entry_factory(&syscall, 0x30, 0, 0, GATE_TASK_32);
-//	idt_set_gate(0x80, )
-	
-	kprintf("TSS ESP: %x, TSS SS: %x, TSS CS: %x, TSS EIP: %x\n", tasks[current_task]->tss.esp, tasks[current_task]->tss.ss, tasks[current_task]->tss.cs, tasks[current_task]->tss.eip);
-	
-	__asm__ volatile("push %0" :: "r"((uint)tasks[current_task]->tss.ss));
-	__asm__ volatile("push %0" :: "r"(tasks[current_task]->tss.esp));
-	__asm__ volatile("push %0" :: "r"(tasks[current_task]->tss.eflags | 0x200));
-	__asm__ volatile("push %0" :: "r"((uint)tasks[current_task]->tss.cs));
-	__asm__ volatile("push %0" :: "r"(tasks[current_task]->tss.eip));
-	__asm__ volatile("	cli \n\
-						mov eax, %0 \n\
-						mov cr3, eax \n\
-						mov ax, 0x90 \n\
-						ltr ax \n\
-						mov al, 0x20 \n\
-						out 0x20, al \n\
-						iret \n\
-						" :: "r"(tasks[current_task]->page_directory));
-}
-*/
 
 void task_peek(task_t* task, uint virtual, uint length, void* buffer)
 {

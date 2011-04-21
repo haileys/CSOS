@@ -3,6 +3,7 @@
 #include "stddef.h"
 #include "idt.h"
 #include "panic.h"
+#include "task.h"
 
 static char* traps[] = {
 	"Divide by zero",
@@ -38,12 +39,16 @@ static char* traps[] = {
 	"Security Exception"
 };
 
+extern uint multitasking_enabled;
 static void trap_handler(uint interrupt, uint error)
 {
-	uint a = 1 / 0;
 	uint cr2;
 	__asm__("mov eax, cr2" : "=a"(cr2));
-	kprintf("TRAP: %s, %d\n", traps[interrupt], interrupt == 14 ? cr2 : error);
+	if(multitasking_enabled)
+	{
+		uint retn_addr = *(uint*)(task_current()->tss.esp0 - 5*4);
+		*(uint*)(task_current()->tss.esp0 - 5*4) = task_current()->exception_handler;
+	}
 }
 
 void trap_init()

@@ -2,11 +2,12 @@ default: all
 
 clean:
 	rm kbin/* ubin/* ksrc/*.o user/*.o ksrc/fs/*.o -f
+	make -C user/pdclib clean
 
 CFLAGS=-m32 -std=c99 -Wall -Wextra -nostdlib -fno-builtin -nostartfiles -nodefaultlibs -fno-exceptions -fno-stack-protector -c -masm=intel
 PWD=$(shell pwd)
 KCFLAGS=-iquote $(PWD)/kinc $(CFLAGS)
-USERCFLAGS=-I $(PWD)/uinc $(CFLAGS)
+USERCFLAGS=-I $(PWD)/uinc -I $(PWD)/user/pdclib/includes -I$(PWD)/user/pdclib/internals $(CFLAGS)
 LDFLAGS=-melf_i386
 
 assembly:
@@ -17,12 +18,13 @@ assembly:
 	nasm -f elf -o kbin/task_asm.o ksrc/task.asm
 	nasm -f elf -o kbin/syscall_asm.o ksrc/syscall.asm
 # build the CRT
-	nasm -f elf -o user/crt.o user/crt/csos.asm
+	nasm -f elf -o user/crt/crt_asm.o user/crt/csos.asm
 
 # Usermode crap
 usermode:
 	gcc $(USERCFLAGS) user/init.c -o ubin/init.o
-	ld -T user_linker.ld -o build/init.bin ubin/*.o $(LDFLAGS)
+	gcc $(USERCFLAGS) user/crt/csos.c -o user/crt/crt_c.o
+	ld -T user_linker.ld -o build/init.bin ubin/*.o $(PWD)/user/pdclib/functions/stdlib/*.o $(PWD)/user/pdclib/functions/_PDCLIB/*.o $(PWD)/user/pdclib/functions/stdio/*.o $(PWD)/user/pdclib/functions/string/*.o $(PWD)/user/crt/crt_c.o $(LDFLAGS)
 
 util:
 	gcc -std=c99 -o util/bin2nasm util/bin2nasm.c

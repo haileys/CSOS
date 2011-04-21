@@ -14,6 +14,7 @@ void sys_read(regs_t* registers);
 void sys_open(regs_t* registers);
 void sys_close(regs_t* registers);
 void sys_write_ebx(regs_t* registers);
+void sys_exception_handler(regs_t* registers);
 
 void syscall_handler(regs_t* registers);
 

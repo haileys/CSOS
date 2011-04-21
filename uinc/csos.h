@@ -1,12 +1,16 @@
 #ifndef CSOS_H
 #define CSOS_H
 
-#define stdin 0
-#define stdout 1
+#include <_PDCLIB_glue.h>
 
 typedef unsigned int uint;
 
+//extern uint stdin;
+//extern uint stdout;
+//extern uint stderr;
+
 void* alloc_page();
+void* alloc_pages(uint n);
 void free_page(void* page);
 
 void exit(int status);

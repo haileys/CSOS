@@ -6,6 +6,8 @@ extern page_directory
 syscall_isr:
 	cli
 	pusha
+	mov eax, 0
+	mov [multitasking_enabled], eax
 	
 	mov eax, cr3
 	mov [.saved_cr3], eax
@@ -35,7 +37,8 @@ syscall_isr:
 	mov eax, [.saved_cr3]
 	mov cr3, eax
 	
+	mov eax, 1
+	mov [multitasking_enabled], eax
 	popa
-	sti
 	iret
 	.saved_cr3 dd 0

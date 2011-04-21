@@ -11,8 +11,6 @@ typedef struct symbol
 __attribute__((__packed__)) symbol_t;
 
 char* cpuid(char* buffer);
-typedef uint(*function_pointer_t)(uint,...);
-function_pointer_t function_by_name(char* name);
 
 void sleep(uint ms);
 

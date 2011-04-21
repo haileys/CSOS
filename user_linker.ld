@@ -1,5 +1,5 @@
 ENTRY (main)
-STARTUP("user/crt.o")
+STARTUP("user/crt/crt_asm.o")
 OUTPUT_FORMAT("binary")
 
 SECTIONS{

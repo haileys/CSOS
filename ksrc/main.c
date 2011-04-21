@@ -60,7 +60,9 @@ void kmain(struct multiboot_info* mbd, unsigned int magic)
 	uint init_size = vfs_size("/init.bin");
 	char* buff = kmalloc(((init_size + PAGE_SIZE-1) / PAGE_SIZE) * PAGE_SIZE);
 	vfs_readfile("/init.bin", 0, init_size, buff);
-	task_create(init_size, buff, PAGE_SIZE);
+	task_create(init_size, buff, 4096);
+//	task_create(init_size, buff, 4096);
+	
 	kfree(buff);
 	
 	cli();

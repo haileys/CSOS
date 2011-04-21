@@ -5,6 +5,7 @@
 #include "stdbool.h"
 #include "fs/vfs.h"
 
+#define MAX_TASKS 128
 #define MAX_FDS 64
 
 typedef struct tss
@@ -83,6 +84,7 @@ typedef struct task
 	task_state_t state;
 	char kernel_stack[8192];
 	vfs_stream_t* fds[MAX_FDS];
+	uint exception_handler;
 }
 __attribute__((__packed__)) /* so i can access the struct straight from assembly */ task_t;
 
@@ -103,10 +105,12 @@ typedef struct regs
 }
 __attribute__((__packed__)) regs_t;
 
+task_t* task_get(uint pid);
 void task_init(uint base_physical, uint high_memory);
 uint alloc_page();
 void free_page(uint page);
 task_t* task_create(uint size, void* code, uint stack_size);
+task_t* task_dup(task_t* task);
 void task_kill_and_free(task_t* task);
 uint task_add_page(task_t* task);
 void task_del_page(task_t* task, uint virtual);
