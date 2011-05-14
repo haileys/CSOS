@@ -19,7 +19,6 @@ extern kprintf
 		mov eax, [.eax]
 		pusha
 		mov eax, [.err]
-		
 		%2
 		push dword %1
 		jmp isr_main

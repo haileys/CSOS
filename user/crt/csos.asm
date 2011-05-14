@@ -2,20 +2,21 @@ extern main
 
 ;;;; syscalls
 
-global alloc_page			; vec 0x01
-global free_page			; vec 0x02
+global sys_alloc_page			; vec 0x01
+global sys_free_page			; vec 0x02
+global sys_exit
 global _PDCLIB_Exit			; vec 0x03
-global kill					; vec 0x04
+global sys_kill					; vec 0x04
 
-global get_pid				; vec 0x05
-global fork					; vec 0x06
-global write				; vec 0x07
-global read					; vec 0x08
+global sys_get_pid				; vec 0x05
+global sys_fork					; vec 0x06
+global sys_write				; vec 0x07
+global sys_read					; vec 0x08
 
-global open					; vec 0x09
-global close				; vec 0x0a
+global sys_open					; vec 0x09
+global sys_close				; vec 0x0a
 
-global exception_handler	; vec 0x0c
+global sys_exception_handler	; vec 0x0c
 
 ;;;; support for pdclib
 global stdin
@@ -25,18 +26,18 @@ global __divdi3
 global errno
 global __errno_location
 
-push __raw_exception_handler
-call exception_handler
-add esp, 4
+;push __raw_exception_handler
+;call exception_handler
+;add esp, 4
 
 call main
-push eax
-call _PDCLIB_Exit
+;push eax
+;call _PDCLIB_Exit
 jmp $
 
-stdin dd 0
-stdout dd 1
-stderr dd 1 ; @TODO fix this to have stderr be its own fd
+;stdin dd 0
+;stdout dd 1
+;stderr dd 1 ; @TODO fix this to have stderr be its own fd
 errno dd 0
 __errno_location dd 0
 
@@ -53,11 +54,11 @@ __c_exception_handler:
 	push dword 21
 	push .msg
 	push dword 1
-	call write
+	call sys_write
 	add esp, 12
 	
 	push dword 1
-	call _PDCLIB_Exit
+	call sys_exit
 
 section .data
 	align 16
@@ -65,26 +66,27 @@ section .data
 
 section .text
 
-alloc_page:
+sys_alloc_page:
 	mov eax, 0x01
 	int 0x80
 	ret
 	
-free_page:
+sys_free_page:
 	push ebx
 	mov eax, 0x02
 	mov ebx, [esp+8]
 	int 0x80
 	pop ebx
 	ret
-	
+
+sys_exit:
 _PDCLIB_Exit:
 	mov ebx, [esp+4]
 	mov eax, 0x03
 	int 0x80
 	ret
 	
-kill:
+sys_kill:
 	push ebx
 	mov eax, 0x04
 	mov ebx, [esp+8]
@@ -92,17 +94,17 @@ kill:
 	pop ebx
 	ret
 	
-get_pid:
+sys_get_pid:
 	mov eax, 0x05
 	int 0x80
 	ret
 
-fork:
+sys_fork:
 	mov eax, 0x06
 	int 0x80
 	ret
 	
-write:
+sys_write:
 	push ebx
 	mov eax, 0x07
 	mov ebx, [esp+8]
@@ -112,7 +114,7 @@ write:
 	pop ebx
 	ret
 	
-read:
+sys_read:
 	push ebx
 	mov eax, 0x08
 	mov ebx, [esp+8]
@@ -122,7 +124,7 @@ read:
 	pop ebx
 	ret
 	
-open:
+sys_open:
 	push ebx
 	mov eax, 0x09
 	mov ebx, [esp+8]
@@ -130,7 +132,7 @@ open:
 	pop ebx
 	ret
 	
-close:
+sys_close:
 	push ebx
 	mov eax, 0x0a
 	mov ebx, [esp+8]
@@ -138,7 +140,7 @@ close:
 	pop ebx
 	ret
 
-exception_handler:
+sys_exception_handler:
 	push ebx
 	mov eax, 0x0c
 	mov ebx, [esp+8]

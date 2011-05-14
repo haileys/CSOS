@@ -26,9 +26,8 @@ syscall_isr:
 	mov fs, ax
 	mov es, ax
 	
-	push dword [.saved_esp]
+	;push dword [.saved_esp]
 	push esp
-	
 	call syscall_handler
 	add esp, 4
 	

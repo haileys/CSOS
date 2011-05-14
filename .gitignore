@@ -8,3 +8,6 @@ kbin/*
 
 hdd.img
 hdd.base.img.old
+
+.*
+._*

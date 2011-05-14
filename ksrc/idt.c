@@ -36,13 +36,15 @@ uint isr_dispatch(uint interrupt, uint errorcode)
 {	
 	if(interrupt == 39) // spurious IRQ 7
 		return interrupt;
-	
+		
+	/*
+	// for debugging purposes
+	if(interrupt != 32)
+		kprintf("Interrupt %d, error %x\n", interrupt, errorcode);
+	*/
+
 	if(isr_handlers[interrupt])
 		isr_handlers[interrupt](interrupt, errorcode);
-	
-	// for debugging purposes
-//	if(interrupt != 32)
-//		kprintf("Interrupt %d, error %x\n", interrupt, errorcode);
 	
 	return interrupt; // important for the assembly handler
 }

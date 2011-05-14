@@ -11,6 +11,4 @@ typedef unsigned long size_t;
 #define offsetof(st, m) \
      ((size_t) ( (char *)&((st *)(0))->m - (char *)0 ))
 
-#define PAGE_SIZE 4096
-
 #endif

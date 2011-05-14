@@ -39,13 +39,13 @@ static char* traps[] = {
 	"Security Exception"
 };
 
-static void trap_handler(uint interrupt, uint error, interrupt_stack_t* int_stack)
+static void trap_handler(uint interrupt, uint error/*, interrupt_stack_t* int_stack*/)
 {
 	uint cr2;
 	__asm__("mov eax, cr2" : "=a"(cr2));
-	if(interrupt == 13)
+	if(/*interrupt == 13*/ true)
 	{
-		kprintf("[#%d] %s. Killed.\n", task_current()->pid, traps[interrupt]);
+		kprintf("[#%d] %s (%d) at 0x%x. Killed.\n", task_current()->pid, traps[interrupt], interrupt, ((uint*)(task_current()->tss.esp0))[-5]);
 		task_kill_and_free(task_current());
 		current_task = 0xffffffff;
 		sti();

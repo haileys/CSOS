@@ -52,9 +52,9 @@ void* _kmalloc(size_t len)
 		if(chunksize == len + 4)
 			break;
 	}
-
-	if(chunksz == 0) { // no chunk was big enough, fail to allocate memory
-		panic("Could not find a sufficiently large chunk");
+	if(chunksz == 0) // no chunk was big enough, fail to allocate memory
+	{
+		panicf("kmalloc failed. No memory to allocate.");
 		return NULL;
 	}
 	
@@ -85,33 +85,29 @@ void _kfree(void* ptr)
 	size_t len = *(size_t*)begin;
 	char* end = begin + len;
 	
-	// first, try to insert the chunk into existing chunks
-	bool chunk_returned = false;
-	uint freed_chunk = 0;
+	uint free_slot = n_chunks++; // if we're going to add a chunk to the end, make sure to increment n_chunks
 	for(uint i = 0; i < n_chunks; i++)
 	{
 		if(!chunks[i].present)
 		{
-			chunks[i].present = true;
-			chunks[i].begin = begin;
-			chunks[i].end = end;
-			chunk_returned = true;
-			freed_chunk = i;
+			// if it turns out we WON'T use a chunk at the end, take off that increment we put before
+			n_chunks--;
+			
+			free_slot = i;
 			break;
 		}
 	}
 	
-	// if we failed to return the chunk, append it to the end
-	if (!chunk_returned) {
-		freed_chunk = n_chunks++;
-		chunks[freed_chunk].present = true;
-		chunks[freed_chunk].begin = begin;
-		chunks[freed_chunk].end = end;
-	}
+	chunks[free_slot].present = true;
+	chunks[free_slot].begin = begin;
+	chunks[free_slot].end = end;
 	
-	while(mm_fix_chunk(freed_chunk, &freed_chunk)) ;
+	uint c = free_slot;
+	while(mm_fix_chunk(c, &c)) ;
 	#ifdef MALLOC_PRINT_DEBUG
 		kprintf("freed.\n", len, file, line);
+	file = file;
+	line = line;
 	#endif
 }
 

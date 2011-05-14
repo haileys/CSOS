@@ -121,7 +121,7 @@ task_switch:
 	; EIP:
 	mov eax, [ebx + 0x20]
 	push eax
-	
+		
 	mov ebp, [ebx + 0x3c]
 	mov esi, [ebx + 0x40]
 	mov edi, [ebx + 0x44]
